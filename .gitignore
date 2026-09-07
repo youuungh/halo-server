@@ -47,6 +47,7 @@ out/
 ### Firebase ###
 serviceAccountKey.json
 **/serviceAccountKey*.json
+
 ### Local ###
 local.properties
 .tmp-openapi-src/
