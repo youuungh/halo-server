@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>카드 등록</title>
+    <script src="https://js.tosspayments.com/v2/standard"></script>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; color: #222222; }
+        .wrap { padding: 24px; }
+        .status { font-size: 14px; color: #8b8b8b; }
+        button { width: 100%; padding: 16px; border: 0; border-radius: 12px; background: #3182f6; color: #fff; font-size: 16px; font-weight: 600; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <p class="status" id="status"></p>
+        <button id="register" style="display:none">카드 등록하기</button>
+    </div>
+    <script>
+        function qp(name) {
+            return new URLSearchParams(window.location.search).get(name);
+        }
+        var clientKey = qp('clientKey');
+        var customerKey = qp('customerKey');
+        var statusEl = document.getElementById('status');
+        var btn = document.getElementById('register');
+
+        if (!clientKey || !customerKey) {
+            statusEl.textContent = '클라이언트 키 또는 customerKey가 없습니다.';
+        } else if (typeof TossPayments === 'undefined') {
+            statusEl.textContent = '결제 모듈을 불러오지 못했습니다.';
+        } else {
+            var tossPayments = TossPayments(clientKey);
+            var payment = tossPayments.payment({ customerKey: customerKey });
+
+            // 성공 시 successUrl로 redirect → 앱 WebView가 haloapp:// 스킴을 인터셉트해 authKey 수신.
+            function launch() {
+                return payment.requestBillingAuth({
+                    method: 'CARD',
+                    successUrl: 'haloapp://billing-auth',
+                    failUrl: 'haloapp://billing-auth?fail=1'
+                });
+            }
+
+            // 진입 즉시 카드 등록창으로. 자동 실행 실패 시에만 버튼 폴백.
+            launch().catch(function () {
+                statusEl.textContent = '아래 버튼을 눌러 카드를 등록하세요.';
+                btn.style.display = '';
+                btn.addEventListener('click', function () {
+                    launch().catch(function (e) {
+                        statusEl.textContent = '카드 등록 실패: ' + (e && e.message ? e.message : e);
+                    });
+                });
+            });
+        }
+    </script>
+</body>
+</html>

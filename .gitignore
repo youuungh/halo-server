@@ -1,0 +1,68 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Environment Variables ###
+.env
+*.env
+.env.local
+.env.prod
+.env.dev
+.env.test
+!.env.example
+
+### Firebase ###
+serviceAccountKey.json
+**/serviceAccountKey*.json
+### Local ###
+local.properties
+.tmp-openapi-src/
+.kotlin/
+
+### H2 ###
+data/*.db
+data/*.trace.db
+__pycache__/
+
+### Local dev only ###
+dev-dashboard.ps1
+caddy-root-ca/
+
+### Runtime data ###
+data/banners.json
+
+### Seed media (local build only) ###
+src/main/resources/seed/

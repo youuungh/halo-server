@@ -1,0 +1,21 @@
+<configuration>
+    <!-- prod 시 LOG_LEVEL=INFO -->
+    <property name="LOG_LEVEL" value="${LOG_LEVEL:-DEBUG}"/>
+    <property name="KTOR_LOG_LEVEL" value="${KTOR_LOG_LEVEL:-DEBUG}"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) │ %cyan(%-35logger{35}) │ %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="${LOG_LEVEL}">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <!-- 불필요한 로그 최소화 -->
+    <logger name="org.eclipse.jetty" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.ktor.server.engine" level="${KTOR_LOG_LEVEL}"/>
+    <logger name="Exposed" level="INFO"/>
+</configuration>

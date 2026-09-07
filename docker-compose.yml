@@ -1,0 +1,64 @@
+﻿services:
+  redis:
+    image: redis:7-alpine
+    container_name: hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - hub-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hub-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./caddy-root-ca:/root-ca
+    networks:
+      - hub-network
+    depends_on:
+      - hub-api
+
+  hub-api:
+    image: hub-api
+    build: .
+    container_name: hub-api
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: dev
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+      FIREBASE_SERVICE_ACCOUNT_KEY: /app/serviceAccountKey.json
+    volumes:
+      - hub_data:/app/data
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    networks:
+      - hub-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  hub_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  hub-network:
+    driver: bridge
