@@ -57,6 +57,12 @@ class ReviewRepositoryImpl : ReviewRepository {
         return true
     }
 
+    override suspend fun hardDeleteReview(reviewId: Int): Boolean {
+        val review = ReviewDao.findById(reviewId) ?: return false
+        review.delete()
+        return true
+    }
+
     /** 리뷰 조회 */
     override suspend fun findReviewById(reviewId: Int): ReviewDao? {
         return ReviewDao.find {

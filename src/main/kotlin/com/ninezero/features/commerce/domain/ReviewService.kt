@@ -406,8 +406,7 @@ class ReviewService(
             )
         } catch (e: Exception) {  // 실패 시 생성한 리뷰까지 롤백
             rollbackReviewImages(uploaded)
-            // 이미지 없는 리뷰만 남는 것 방지
-            runCatching { deleteReview(created.id, userId) }
+            runCatching { query { reviewRepository.hardDeleteReview(created.id) } }
                 .onFailure { logger.warn("리뷰 생성 롤백 실패: reviewId={} - {}", created.id, it.message) }
             throw e
         }

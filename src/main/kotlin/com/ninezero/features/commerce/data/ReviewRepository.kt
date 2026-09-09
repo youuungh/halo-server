@@ -29,6 +29,7 @@ interface ReviewRepository {
     ): ReviewDao?
 
     suspend fun deleteReview(reviewId: Int): Boolean
+    suspend fun hardDeleteReview(reviewId: Int): Boolean
 
     // 리뷰 조회
     suspend fun findReviewById(reviewId: Int): ReviewDao?
