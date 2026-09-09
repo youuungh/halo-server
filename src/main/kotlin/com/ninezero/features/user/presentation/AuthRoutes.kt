@@ -632,8 +632,8 @@ fun Route.authRoutes() {
                     )
                 }
 
-                sessionService.revokeDevice(userId, sessionIdToDelete)
                 authService.logout(sessionIdToDelete)
+                sessionService.revokeDevice(userId, sessionIdToDelete)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(message = Messages.Auth.DEVICE_LOGOUT_SUCCESS))
             }
         }
