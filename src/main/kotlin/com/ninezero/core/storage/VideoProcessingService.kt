@@ -36,8 +36,7 @@ class VideoProcessingService {
                 temp.absolutePath
             ).redirectErrorStream(true).start()
 
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            process.waitFor()
+            val output = process.captureAndWait() ?: return@withContext VideoMetadata()
             parseMetadata(output)
         } catch (e: Exception) {
             logger.warn("비디오 메타데이터 추출 실패: {}", e.message)

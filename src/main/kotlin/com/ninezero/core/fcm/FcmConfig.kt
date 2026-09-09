@@ -17,6 +17,12 @@ object FcmConfig {
             return
         }
 
+        if (FirebaseApp.getApps().isNotEmpty()) {
+            isInitialized = true
+            logger.debug("Firebase 기본 앱이 이미 존재하여 초기화를 건너뜁니다")
+            return
+        }
+
         try {
             val jsonContent = DotenvConfig["FIREBASE_CREDENTIALS_JSON"]
 

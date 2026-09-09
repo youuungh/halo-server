@@ -26,6 +26,7 @@ import com.ninezero.features.user.toCreatorApplicationResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
+import java.util.Locale
 
 class CreatorApplicationService(
     private val applicationRepository: CreatorApplicationRepository,
@@ -378,7 +379,7 @@ class CreatorApplicationService(
                 applicationsThisWeek = applicationRepository.countApplicationsByDateRange(weekStart, todayEnd),
                 applicationsThisMonth = applicationRepository.countApplicationsByDateRange(monthStart, todayEnd),
                 totalActiveCreators = userRepository.countUsersByRole(UserRole.CREATOR),
-                avgApprovalTime = String.format("%.1f", avgApprovalTime)
+                avgApprovalTime = String.format(Locale.ROOT, "%.1f", avgApprovalTime)
             )
         }
     }
