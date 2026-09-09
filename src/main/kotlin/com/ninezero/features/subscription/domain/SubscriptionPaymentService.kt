@@ -67,8 +67,12 @@ class SubscriptionPaymentService(
         val orderId = generateNumericOrderId()
         val confirmed = charge(ctx, orderId, "구독 - ${ctx.planName}")
 
-        query {
-            recordSubPayment(subscriptionId, ctx.amount, isRenewal = false, orderId = orderId, confirmed = confirmed)
+        try {
+            query {
+                recordSubPayment(subscriptionId, ctx.amount, isRenewal = false, orderId = orderId, confirmed = confirmed)
+            }
+        } catch (e: Exception) {
+            logger.error("구독 초회 결제 기록 실패(청구는 완료됨): subscriptionId={}, orderId={}, error={}", subscriptionId, orderId, e.message)
         }
 
         return Messages.Commerce.PAYMENT_SUCCESS
