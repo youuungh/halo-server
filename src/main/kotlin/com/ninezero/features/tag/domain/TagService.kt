@@ -124,6 +124,10 @@ class TagService(
                 throw CreatorOnlyException(Errors.Social.Tag.ONLY_CREATOR_CAN_MANAGE_TAGS)
             }
 
+            if (tagRepository.countPostsByTag(tagId) > 0 || tagRepository.countProductsByTag(tagId) > 0) {
+                throw ConflictException(Errors.Social.Tag.TAG_IN_USE)
+            }
+
             tagRepository.deleteTag(tagId)  // 소유자 확인 후 삭제
         }
 

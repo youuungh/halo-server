@@ -230,6 +230,7 @@ object Errors {
             const val INVALID_TAG_ID = "유효하지 않은 태그 ID입니다."
             const val TAG_ALREADY_EXISTS = "이미 존재하는 태그명입니다."
             const val ONLY_CREATOR_CAN_MANAGE_TAGS = "크리에이터만 태그를 관리할 수 있습니다."
+            const val TAG_IN_USE = "사용 중인 태그는 삭제할 수 없습니다."
             const val SECTION_TAG_NOT_IN_SELECTED_TAGS = "섹션 태그는 선택한 태그 중 하나여야 합니다."
 
             // 검증
