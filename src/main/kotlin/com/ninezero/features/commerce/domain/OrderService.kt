@@ -16,6 +16,7 @@ import com.ninezero.core.database.entities.commerce.ProductDao
 import com.ninezero.features.commerce.data.CartRepository
 import com.ninezero.features.commerce.data.OrderItemWithProduct
 import com.ninezero.features.commerce.data.OrderRepository
+import com.ninezero.features.commerce.data.ProductStatusRules
 import com.ninezero.features.commerce.data.OrderShipmentData
 import com.ninezero.features.commerce.data.PaymentRepository
 import com.ninezero.features.commerce.data.ProductRepository
@@ -313,6 +314,7 @@ class OrderService(
                 val product = products[item.productId]
                     ?: throw ProductNotFoundException(item.productId)
                 product.stock += item.quantity
+                ProductStatusRules.syncByStock(product)
             }
 
             if (pointRefund > BigDecimal.ZERO) {
