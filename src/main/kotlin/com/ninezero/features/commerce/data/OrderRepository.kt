@@ -23,7 +23,8 @@ data class OrderItemWithProduct(
 data class OrderShipmentData(
     val creatorId: Int,
     val shippingFee: BigDecimal,
-    val couponDiscount: BigDecimal = BigDecimal.ZERO
+    val couponDiscount: BigDecimal = BigDecimal.ZERO,
+    val couponCode: String? = null
 )
 
 /** 크리에이터 매출 집계 */
@@ -64,7 +65,6 @@ interface OrderRepository {
         items: List<OrderItemData>,
         pointsUsed: BigDecimal = BigDecimal.ZERO,
         couponDiscount: BigDecimal = BigDecimal.ZERO,
-        couponCode: String? = null,
         shippingFee: BigDecimal = BigDecimal.ZERO,
         subscriptionTiers: String? = null,
         shipments: List<OrderShipmentData> = emptyList()

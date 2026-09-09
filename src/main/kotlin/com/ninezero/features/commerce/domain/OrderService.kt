@@ -328,14 +328,8 @@ class OrderService(
             mergeOrderState(order, shipmentsAfter)
 
             // 그룹 취소 즉시 쿠폰 복구
-            if (order.couponCode != null) {
-                val codes = order.couponCode!!.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                for (code in codes) {
-                    val coupon = couponRepository.findByCode(code)
-                    if (coupon != null && coupon.creatorId == creatorId) {
-                        couponRedemptionService.refundCouponInTransaction(userId = buyerUserId, couponCode = code)
-                    }
-                }
+            shipment.couponCode?.let { code ->
+                couponRedemptionService.refundCouponInTransaction(userId = buyerUserId, couponCode = code)
             }
 
             if (shipmentsAfter.all { it.status == OrderStatus.CANCELLED }) {
@@ -462,6 +456,7 @@ class OrderService(
 
             var couponDiscount = BigDecimal.ZERO
             val couponDiscountByCreator = mutableMapOf<Int, BigDecimal>()
+            val couponCodeByCreator = mutableMapOf<Int, String>()
             val appliedCouponCodes = mutableListOf<String>()
             val freeShippingCouponCodes = mutableListOf<String>()
             if (!request.couponCodes.isNullOrEmpty()) {
@@ -489,6 +484,14 @@ class OrderService(
                     appliedCouponCodes.add(code)
                     val coupon = couponRepository.findByCode(code)
 
+                    // 쿠폰은 크리에이터당 하나만
+                    if (coupon != null) {
+                        if (couponCodeByCreator.containsKey(coupon.creatorId)) {
+                            throw CouponValidationException(Errors.Coupon.COUPON_DUPLICATE_CREATOR)
+                        }
+                        couponCodeByCreator[coupon.creatorId] = code
+                    }
+
                     // FREE_SHIPPING 쿠폰인 경우 배송비 차감
                     if (discount > BigDecimal.ZERO && discount <= totalShippingFee) {
                         if (coupon != null && coupon.type == CouponType.FREE_SHIPPING) {
@@ -507,8 +510,6 @@ class OrderService(
                     }
                 }
             }
-            val couponCode: String? = appliedCouponCodes.takeIf { it.isNotEmpty() }?.joinToString(",")
-
             val finalAmount = totalPrice.subtract(pointsUsed).subtract(couponDiscount).add(totalShippingFee)
             if (finalAmount < BigDecimal.ZERO) {
                 throw InvalidOrderAmountException(Errors.Commerce.Order.INVALID_FINAL_AMOUNT)
@@ -531,14 +532,14 @@ class OrderService(
                 items = orderItems,
                 pointsUsed = pointsUsed,
                 couponDiscount = couponDiscount,
-                couponCode = couponCode,
                 shippingFee = totalShippingFee,
                 subscriptionTiers = subscriptionTiersJson,
                 shipments = shippingFeeByCreator.map { (creatorId, fee) ->
                     OrderShipmentData(
                         creatorId = creatorId,
                         shippingFee = fee,
-                        couponDiscount = couponDiscountByCreator[creatorId] ?: BigDecimal.ZERO
+                        couponDiscount = couponDiscountByCreator[creatorId] ?: BigDecimal.ZERO,
+                        couponCode = couponCodeByCreator[creatorId]
                     )
                 }
             )
@@ -704,12 +705,11 @@ class OrderService(
                 pointService.refundPointsInTransaction(userId = userId, amount = order.pointsUsed, orderId = orderId)
             }
 
-            if (order.couponCode != null) {
-                val codes = order.couponCode!!.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                for (code in codes) {
+            orderRepository.findOrderShipments(orderId)
+                .mapNotNull { it.couponCode }
+                .forEach { code ->
                     couponRedemptionService.refundCouponInTransaction(userId = userId, couponCode = code)
                 }
-            }
 
             val (items, products, itemsWithProducts) = fetchOrderItemsWithProducts(orderId)
             val creatorIdList = items.mapNotNull { products[it.productId]?.creatorId }.distinct()
@@ -1040,7 +1040,7 @@ class OrderService(
             deliveryStatusText = trace.deliveryStatusText,
             lastProgressAt = trace.dateLastProgress,
             queriedAt = trace.queriedAt,
-            progresses = trace.progresses?.map(::toShippingProgressResponse) ?: emptyList()
+            progresses = trace.progresses.map(::toShippingProgressResponse)
         )
     }
 
@@ -1439,6 +1439,11 @@ class OrderService(
             else -> null
         }
 
+        val orderCouponCode = orderRepository.findOrderShipments(order.id.value)
+            .mapNotNull { it.couponCode }
+            .joinToString(",")
+            .ifEmpty { null }
+
         order.toOrderResponse(
             items = visibleItems,
             payment = payment,
@@ -1449,7 +1454,8 @@ class OrderService(
             carrierOverride = primaryGroup?.carrier,
             shippingStatusOverride = primaryGroup?.shippingStatus ?: mergeShippingStatus(visibleGroups),
             estimatedDeliveryDateOverride = primaryGroup?.estimatedDeliveryDate,
-            actualDeliveryDateOverride = primaryGroup?.actualDeliveryDate
+            actualDeliveryDateOverride = primaryGroup?.actualDeliveryDate,
+            couponCode = orderCouponCode
         )
     }
 

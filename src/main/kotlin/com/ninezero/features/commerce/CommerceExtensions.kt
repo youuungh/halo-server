@@ -155,7 +155,8 @@ fun OrderDao.toOrderResponse(
     carrierOverride: String? = null,
     shippingStatusOverride: ShippingStatus? = null,
     estimatedDeliveryDateOverride: LocalDateTime? = null,
-    actualDeliveryDateOverride: LocalDateTime? = null
+    actualDeliveryDateOverride: LocalDateTime? = null,
+    couponCode: String? = null
 ): OrderResponse {
     return OrderResponse(
         id = id.value,

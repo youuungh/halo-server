@@ -23,7 +23,6 @@ object OrderTable : BaseIntIdTable("orders") {
     // 포인트 및 쿠폰 관련 필드
     val pointsUsed = decimal("points_used", 10, 2).default(BigDecimal.ZERO)
     val couponDiscount = decimal("coupon_discount", 10, 2).default(BigDecimal.ZERO)
-    val couponCode = varchar("coupon_code", 20).nullable()
 
     // 배송비
     val shippingFee = decimal("shipping_fee", 10, 2).default(BigDecimal.ZERO)
@@ -58,7 +57,6 @@ class OrderDao(id: EntityID<Int>) : BaseIntEntity(id, OrderTable) {
     var memo by OrderTable.memo
     var pointsUsed by OrderTable.pointsUsed
     var couponDiscount by OrderTable.couponDiscount
-    var couponCode by OrderTable.couponCode
     var shippingFee by OrderTable.shippingFee
     var subscriptionTiers by OrderTable.subscriptionTiers
     var trackingNumber by OrderTable.trackingNumber

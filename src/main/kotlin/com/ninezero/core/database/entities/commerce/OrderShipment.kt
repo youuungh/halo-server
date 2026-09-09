@@ -16,6 +16,7 @@ object OrderShipmentTable : BaseIntIdTable("order_shipments") {
     val status = enumerationByName<OrderStatus>("status", 50).default(OrderStatus.PENDING)
     val shippingFee = decimal("shipping_fee", 10, 2).default(BigDecimal.ZERO)
     val couponDiscount = decimal("coupon_discount", 10, 2).default(BigDecimal.ZERO)
+    val couponCode = varchar("coupon_code", 20).nullable()
     val trackingNumber = varchar("tracking_number", 100).nullable()
     val carrier = varchar("carrier", 50).nullable()
     val deliverySubscriptionId = varchar("delivery_subscription_id", 120).nullable()
@@ -41,6 +42,7 @@ class OrderShipmentDao(id: EntityID<Int>) : BaseIntEntity(id, OrderShipmentTable
     var status by OrderShipmentTable.status
     var shippingFee by OrderShipmentTable.shippingFee
     var couponDiscount by OrderShipmentTable.couponDiscount
+    var couponCode by OrderShipmentTable.couponCode
     var trackingNumber by OrderShipmentTable.trackingNumber
     var carrier by OrderShipmentTable.carrier
     var deliverySubscriptionId by OrderShipmentTable.deliverySubscriptionId

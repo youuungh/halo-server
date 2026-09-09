@@ -30,7 +30,6 @@ class OrderRepositoryImpl : OrderRepository {
         items: List<OrderItemData>,
         pointsUsed: BigDecimal,
         couponDiscount: BigDecimal,
-        couponCode: String?,
         shippingFee: BigDecimal,
         subscriptionTiers: String?,
         shipments: List<OrderShipmentData>
@@ -46,7 +45,6 @@ class OrderRepositoryImpl : OrderRepository {
             this.memo = memo
             this.pointsUsed = pointsUsed
             this.couponDiscount = couponDiscount
-            this.couponCode = couponCode
             this.shippingFee = shippingFee
             this.subscriptionTiers = subscriptionTiers
         }
@@ -78,6 +76,7 @@ class OrderRepositoryImpl : OrderRepository {
                 this.status = OrderStatus.PENDING
                 this.shippingFee = shipmentData.shippingFee
                 this.couponDiscount = shipmentData.couponDiscount
+                this.couponCode = shipmentData.couponCode
                 this.shippingStatus = ShippingStatus.PREPARING
             }
         }

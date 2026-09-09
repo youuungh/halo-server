@@ -447,6 +447,7 @@ object Errors {
         const val COUPON_DISCOUNT_RATE_EXCEEDED = "할인율은 100%를 초과할 수 없습니다."
         const val COUPON_CODE_FORMAT_INVALID = "쿠폰 코드는 영문 대문자와 숫자만 사용 가능합니다."
         const val COUPON_CODE_INVALID = "유효하지 않은 쿠폰 코드입니다."
+        const val COUPON_DUPLICATE_CREATOR = "크리에이터당 쿠폰은 하나만 사용할 수 있습니다."
         const val FREE_SHIPPING_COUPON_NOT_ALLOWED_FOR_SUBSCRIBERS = "멤버십 구독 중에는 이미 무료배송이 적용됩니다."
     }
 }
