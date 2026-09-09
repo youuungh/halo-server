@@ -17,6 +17,7 @@ import com.ninezero.features.social.data.PostRepository
 import com.ninezero.features.share.presentation.models.request.SharePostRequest
 import com.ninezero.features.share.presentation.models.request.ShareProductRequest
 import com.ninezero.features.share.presentation.models.response.ShareResponse
+import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -29,6 +30,7 @@ class ShareService(
     private val notificationService: NotificationService,
     private val userRepository: UserRepository,
     private val followRepository: FollowRepository,
+    private val blockedUserRepository: BlockedUserRepository,
     private val coroutineScope: CoroutineScope
 ) {
     private val logger = logger()
@@ -194,7 +196,9 @@ class ShareService(
         }
 
         val followingMap = followRepository.checkMultipleFollowStatus(currentUserId, validRecipients)
-        val followingRecipients = validRecipients.filter { followingMap[it] == true }
+        val followingRecipients = validRecipients
+            .filter { followingMap[it] == true }
+            .filter { !blockedUserRepository.isBlockedEither(currentUserId, it) }
 
         if (followingRecipients.isEmpty()) {
             throw InvalidInputException("팔로잉 중인 사용자에게만 공유할 수 있습니다.")
