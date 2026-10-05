@@ -1,0 +1,3 @@
+hub.local, localhost {
+	reverse_proxy hub-api:8080
+}

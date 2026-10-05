@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Gradle
+.gradle
+build
+!build/libs/*.jar
+
+# IDE
+.idea
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경 변수
+.env
+.env.local
+.env.prod
+serviceAccountKey.json
+serviceAccountKey*.json
+
+# 로그
+*.log
+
+# 데이터
+data/
+*.db
