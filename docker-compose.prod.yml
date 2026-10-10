@@ -1,0 +1,105 @@
+# 운영 서버용. 로컬 Docker 테스트는 docker-compose.yml
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# 같은 폴더에 필요한 것: .env, Caddyfile.prod, serviceAccountKey.json, data/banners.json
+# hub-api 이미지는 빌드한 머신에서 옮겨 와 docker load 로 올린다
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hub-postgres
+    environment:
+      POSTGRES_DB: hub
+      POSTGRES_USER: ${DATABASE_USER:?}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hub-network
+    restart: unless-stopped
+    mem_limit: 384m
+    logging: *logging
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: hub-redis
+    # 캐시 전용이라 디스크 저장 없이 메모리 상한만 둔다
+    command: redis-server --save "" --maxmemory 64mb --maxmemory-policy allkeys-lru
+    networks:
+      - hub-network
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hub-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - hub-network
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
+    depends_on:
+      - hub-api
+
+  hub-api:
+    image: hub-api
+    container_name: hub-api
+    # 힙은 컨테이너 한도의 절반, 나머지는 메타스페이스와 ffmpeg 몫
+    entrypoint: [ "java", "-XX:MaxRAMPercentage=50", "-jar", "app.jar" ]
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/hub
+      DATABASE_DRIVER: org.postgresql.Driver
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+      FIREBASE_SERVICE_ACCOUNT_KEY: /app/serviceAccountKey.json
+    volumes:
+      - ./data:/app/data:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    networks:
+      - hub-network
+    restart: unless-stopped
+    mem_limit: 1200m
+    logging: *logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  hub-network:
+    driver: bridge

@@ -14,6 +14,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -109,78 +110,80 @@ fun Route.communityRoutes() {
                 )
             }
 
-            put("/{postId}", {
-                summary = "커뮤니티 글 수정"
-                tags("Community")
-                request {
-                    pathParameter<Int>("postId") {
-                        description = "게시글 ID"
-                        required = true
-                    }
-                    queryParameter<Int>("creatorId") {
-                        description = "크리에이터 ID (Multipart 요청 시 필수)"
-                        required = false
-                    }
-                    body<CommunityPostRequest> {
-                        description = "수정할 내용 (JSON)"
-                        required = false
-                    }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.OK) {
-                        description = "커뮤니티 글 수정 성공"
-                    }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "잘못된 요청"
-                    }
-                    code(HttpStatusCode.Forbidden) {
-                        description = "작성자 본인만 수정 가능"
-                    }
-                    code(HttpStatusCode.NotFound) {
-                        description = "게시글 없음"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@put
-
-                val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
-                    ?: return@put
-
-                val contentType = call.request.contentType()
-
-                val response = if (contentType.match(ContentType.MultiPart.FormData)) {
-                    val creatorId = call.getRequiredIntParam("creatorId", Errors.Common.INVALID_CREATOR_ID)
-                        ?: return@put
-
-                    var content: String? = null
-                    val keepMediaIds = mutableListOf<Int>()
-                    val reorder = mutableListOf<Int>()
-
-                    val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST) { name, value ->
-                        when (name) {
-                            "content" -> content = value
-                            "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
-                            "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+            rateLimit(RateLimitName("upload")) {
+                put("/{postId}", {
+                    summary = "커뮤니티 글 수정"
+                    tags("Community")
+                    request {
+                        pathParameter<Int>("postId") {
+                            description = "게시글 ID"
+                            required = true
+                        }
+                        queryParameter<Int>("creatorId") {
+                            description = "크리에이터 ID (Multipart 요청 시 필수)"
+                            required = false
+                        }
+                        body<CommunityPostRequest> {
+                            description = "수정할 내용 (JSON)"
+                            required = false
                         }
                     }
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.OK) {
+                            description = "커뮤니티 글 수정 성공"
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "잘못된 요청"
+                        }
+                        code(HttpStatusCode.Forbidden) {
+                            description = "작성자 본인만 수정 가능"
+                        }
+                        code(HttpStatusCode.NotFound) {
+                            description = "게시글 없음"
+                        }
+                    }
+                }) {
+                    val userId = call.requireUserId() ?: return@put
 
-                    communityService.updateCommunityWithMedia(
-                        postId = postId,
-                        userId = userId,
-                        creatorId = creatorId,
-                        content = content,
-                        keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
-                        newFiles = if (newFiles.isEmpty()) null else newFiles,
-                        newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
-                        reorder = if (reorder.isEmpty()) null else reorder
-                    )
-                } else {
-                    val request = call.receive<CommunityPostRequest>()
-                    communityService.updateCommunityPost(postId, userId, request)
+                    val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
+                        ?: return@put
+
+                    val contentType = call.request.contentType()
+
+                    val response = if (contentType.match(ContentType.MultiPart.FormData)) {
+                        val creatorId = call.getRequiredIntParam("creatorId", Errors.Common.INVALID_CREATOR_ID)
+                            ?: return@put
+
+                        var content: String? = null
+                        val keepMediaIds = mutableListOf<Int>()
+                        val reorder = mutableListOf<Int>()
+
+                        val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST) { name, value ->
+                            when (name) {
+                                "content" -> content = value
+                                "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                                "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                            }
+                        }
+
+                        communityService.updateCommunityWithMedia(
+                            postId = postId,
+                            userId = userId,
+                            creatorId = creatorId,
+                            content = content,
+                            keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
+                            newFiles = if (newFiles.isEmpty()) null else newFiles,
+                            newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
+                            reorder = if (reorder.isEmpty()) null else reorder
+                        )
+                    } else {
+                        val request = call.receive<CommunityPostRequest>()
+                        communityService.updateCommunityPost(postId, userId, request)
+                    }
+
+                    call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.POST_UPDATED))
                 }
-
-                call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.POST_UPDATED))
             }
 
             delete("/{postId}", {

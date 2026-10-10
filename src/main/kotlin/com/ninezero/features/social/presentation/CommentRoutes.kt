@@ -15,6 +15,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -179,67 +180,69 @@ fun Route.commentRoutes() {
                 call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Social.COMMENT_CREATED))
             }
 
-            put("/{commentId}", {
-                summary = "댓글 수정"
-                tags("Comments")
-                request {
-                    pathParameter<Int>("commentId") {
-                        description = "댓글 ID"
-                        required = true
-                    }
-                    body<UpdateCommentRequest> {
-                        description = "수정할 내용"
-                        required = true
-                        example("default") {
-                            value = UpdateCommentRequest(
-                                content = "수정된 댓글 내용입니다."
-                            )
+            rateLimit(RateLimitName("upload")) {
+                put("/{commentId}", {
+                    summary = "댓글 수정"
+                    tags("Comments")
+                    request {
+                        pathParameter<Int>("commentId") {
+                            description = "댓글 ID"
+                            required = true
+                        }
+                        body<UpdateCommentRequest> {
+                            description = "수정할 내용"
+                            required = true
+                            example("default") {
+                                value = UpdateCommentRequest(
+                                    content = "수정된 댓글 내용입니다."
+                                )
+                            }
                         }
                     }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Forbidden) {
-                        description = "본인 댓글만 수정 가능"
-                    }
-                    code(HttpStatusCode.NotFound) {
-                        description = "댓글 없음"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@put
-
-                val commentId = call.getRequiredIntParam("commentId", Errors.Social.Comment.INVALID_COMMENT_ID)
-                    ?: return@put
-
-                val contentType = call.request.contentType()
-                val response = if (contentType.match(ContentType.MultiPart.FormData)) {
-                    var content: String? = null
-                    val keepMediaIds = mutableListOf<Int>()
-                    val reorder = mutableListOf<Int>()
-
-                    val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.COMMENT) { name, value ->
-                        when (name) {
-                            "content" -> content = value
-                            "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
-                            "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Forbidden) {
+                            description = "본인 댓글만 수정 가능"
+                        }
+                        code(HttpStatusCode.NotFound) {
+                            description = "댓글 없음"
                         }
                     }
+                }) {
+                    val userId = call.requireUserId() ?: return@put
 
-                    commentService.updateCommentWithMedia(
-                        commentId = commentId,
-                        userId = userId,
-                        content = content,
-                        keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
-                        newFiles = if (newFiles.isEmpty()) null else newFiles,
-                        newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
-                        reorder = if (reorder.isEmpty()) null else reorder
-                    )
-                } else {
-                    val request = call.receive<UpdateCommentRequest>()
-                    commentService.updateComment(commentId, userId, request.content)
+                    val commentId = call.getRequiredIntParam("commentId", Errors.Social.Comment.INVALID_COMMENT_ID)
+                        ?: return@put
+
+                    val contentType = call.request.contentType()
+                    val response = if (contentType.match(ContentType.MultiPart.FormData)) {
+                        var content: String? = null
+                        val keepMediaIds = mutableListOf<Int>()
+                        val reorder = mutableListOf<Int>()
+
+                        val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.COMMENT) { name, value ->
+                            when (name) {
+                                "content" -> content = value
+                                "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                                "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                            }
+                        }
+
+                        commentService.updateCommentWithMedia(
+                            commentId = commentId,
+                            userId = userId,
+                            content = content,
+                            keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
+                            newFiles = if (newFiles.isEmpty()) null else newFiles,
+                            newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
+                            reorder = if (reorder.isEmpty()) null else reorder
+                        )
+                    } else {
+                        val request = call.receive<UpdateCommentRequest>()
+                        commentService.updateComment(commentId, userId, request.content)
+                    }
+                    call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.COMMENT_UPDATED))
                 }
-                call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.COMMENT_UPDATED))
             }
 
             delete("/{commentId}", {

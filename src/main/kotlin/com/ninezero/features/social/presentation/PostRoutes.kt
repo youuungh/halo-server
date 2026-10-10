@@ -34,6 +34,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -257,106 +258,108 @@ fun Route.postRoutes() {
                 call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Social.POST_CREATED))
             }
 
-            put("/{postId}", {
-                summary = "포스트 수정"
-                tags("Posts")
-                description = "JSON 또는 multipart"
-                request {
-                    pathParameter<Int>("postId") {
-                        description = "포스트 ID"
-                        required = true
-                    }
-                    body<UpdatePostRequest> {
-                        description = "수정할 포스트 정보 (JSON)"
-                        required = false
-                    }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Forbidden) {
-                        description = "본인 포스트만 수정 가능"
-                    }
-                    code(HttpStatusCode.NotFound) {
-                        description = "포스트 없음"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@put
-
-                val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
-                    ?: return@put
-
-                val contentType = call.request.contentType()
-
-                val response = if (contentType.match(ContentType.MultiPart.FormData)) {
-                    var content: String? = null
-                    val keepMediaIds = mutableListOf<Int>()
-                    val reorder = mutableListOf<Int>()
-                    var items: String? = null
-
-                    val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST) { name, value ->
-                        when (name) {
-                            "content" -> content = value
-                            "items" -> items = value
-                            "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
-                            "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+            rateLimit(RateLimitName("upload")) {
+                put("/{postId}", {
+                    summary = "포스트 수정"
+                    tags("Posts")
+                    description = "JSON 또는 multipart"
+                    request {
+                        pathParameter<Int>("postId") {
+                            description = "포스트 ID"
+                            required = true
+                        }
+                        body<UpdatePostRequest> {
+                            description = "수정할 포스트 정보 (JSON)"
+                            required = false
                         }
                     }
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Forbidden) {
+                            description = "본인 포스트만 수정 가능"
+                        }
+                        code(HttpStatusCode.NotFound) {
+                            description = "포스트 없음"
+                        }
+                    }
+                }) {
+                    val userId = call.requireUserId() ?: return@put
 
-                    postMediaService.updatePostWithMedia(
-                        postId = postId,
-                        userId = userId,
-                        content = content,
-                        keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
-                        newFiles = if (newFiles.isEmpty()) null else newFiles,
-                        newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
-                        reorder = if (reorder.isEmpty()) null else reorder,
-                        items = items?.let(::parseMediaItems)
-                    )
-                } else {
-                    val request = call.receive<UpdatePostRequest>()
-                    postService.updatePost(postId, userId, request)
+                    val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
+                        ?: return@put
+
+                    val contentType = call.request.contentType()
+
+                    val response = if (contentType.match(ContentType.MultiPart.FormData)) {
+                        var content: String? = null
+                        val keepMediaIds = mutableListOf<Int>()
+                        val reorder = mutableListOf<Int>()
+                        var items: String? = null
+
+                        val (newFiles, newContentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST) { name, value ->
+                            when (name) {
+                                "content" -> content = value
+                                "items" -> items = value
+                                "keepMediaIds" -> keepMediaIds.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                                "reorder" -> reorder.addAll(value.split(",").mapNotNull { it.trim().toIntOrNull() })
+                            }
+                        }
+
+                        postMediaService.updatePostWithMedia(
+                            postId = postId,
+                            userId = userId,
+                            content = content,
+                            keepMediaIds = if (keepMediaIds.isEmpty()) null else keepMediaIds,
+                            newFiles = if (newFiles.isEmpty()) null else newFiles,
+                            newContentTypes = if (newContentTypes.isEmpty()) null else newContentTypes,
+                            reorder = if (reorder.isEmpty()) null else reorder,
+                            items = items?.let(::parseMediaItems)
+                        )
+                    } else {
+                        val request = call.receive<UpdatePostRequest>()
+                        postService.updatePost(postId, userId, request)
+                    }
+
+                    call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.POST_UPDATED))
                 }
 
-                call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Social.POST_UPDATED))
-            }
+                post("/{postId}/uploads", {
+                    summary = "포스트 영상 업로드 준비"
+                    tags("Posts")
+                    description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 수정 요청 items의 uploadId로 붙임"
+                    request {
+                        pathParameter<Int>("postId") {
+                            description = "포스트 ID"
+                            required = true
+                        }
+                        body<VideoUploadPrepareRequest> {
+                            description = "영상 형식, 크기"
+                            required = true
+                        }
+                    }
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "업로드 URL 발급 성공"
+                            body<ApiResponse<UploadPrepareResponse>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "크기 초과 또는 지원하지 않는 형식"
+                        }
+                        code(HttpStatusCode.Forbidden) {
+                            description = "본인 포스트만 가능"
+                        }
+                    }
+                }) {
+                    val userId = call.requireUserId() ?: return@post
 
-            post("/{postId}/uploads", {
-                summary = "포스트 영상 업로드 준비"
-                tags("Posts")
-                description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 수정 요청 items의 uploadId로 붙임"
-                request {
-                    pathParameter<Int>("postId") {
-                        description = "포스트 ID"
-                        required = true
-                    }
-                    body<VideoUploadPrepareRequest> {
-                        description = "영상 형식, 크기"
-                        required = true
-                    }
+                    val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
+                        ?: return@post
+
+                    val request = call.receive<VideoUploadPrepareRequest>()
+                    val response = postMediaService.preparePostVideoUpload(postId, userId, request)
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response))
                 }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "업로드 URL 발급 성공"
-                        body<ApiResponse<UploadPrepareResponse>>()
-                    }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "크기 초과 또는 지원하지 않는 형식"
-                    }
-                    code(HttpStatusCode.Forbidden) {
-                        description = "본인 포스트만 가능"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-
-                val postId = call.getRequiredIntParam("postId", Errors.Social.Post.INVALID_POST_ID)
-                    ?: return@post
-
-                val request = call.receive<VideoUploadPrepareRequest>()
-                val response = postMediaService.preparePostVideoUpload(postId, userId, request)
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response))
             }
 
             delete("/{postId}", {

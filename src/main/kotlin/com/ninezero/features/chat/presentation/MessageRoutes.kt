@@ -17,6 +17,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -90,91 +91,93 @@ fun Route.messageRoutes() {
                 call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Chat.MESSAGE_SENT))
             }
 
-            post("/{roomId}/images", {
-                summary = "채팅 이미지 업로드"
-                tags("Messages")
-                request {
-                    pathParameter<Int>("roomId") {
-                        description = "채팅방 ID"
-                        required = true
+            rateLimit(RateLimitName("upload")) {
+                post("/{roomId}/images", {
+                    summary = "채팅 이미지 업로드"
+                    tags("Messages")
+                    request {
+                        pathParameter<Int>("roomId") {
+                            description = "채팅방 ID"
+                            required = true
+                        }
+                        multipartBody {
+                            description = "이미지 파일들"
+                            required = true
+                        }
                     }
-                    multipartBody {
-                        description = "이미지 파일들"
-                        required = true
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "이미지 업로드 성공"
+                            body<ApiResponse<ChatImageUploadResponse>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "이미지 파일 없음"
+                        }
+                        code(HttpStatusCode.NotFound) {
+                            description = "채팅방 없음"
+                        }
+                        code(HttpStatusCode.Forbidden) {
+                            description = "채팅방 업로드 권한 없음"
+                        }
                     }
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+
+                    val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
+                        ?: return@post
+
+                    val (images, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.CHAT_IMAGE)
+
+                    if (images.isEmpty()) {
+                        return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES))
+                    }
+
+                    val uploaded = messageService.uploadChatImages(roomId, userId, images)
+                    val response = ChatImageUploadResponse(
+                        imageUrls = uploaded.map { it.first },
+                        thumbnailUrls = uploaded.map { it.second ?: it.first }
+                    )
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Common.IMAGE_UPLOADED))
                 }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "이미지 업로드 성공"
-                        body<ApiResponse<ChatImageUploadResponse>>()
+
+                post("/{roomId}/uploads", {
+                    summary = "채팅 영상·파일 업로드 준비"
+                    tags("Messages")
+                    description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 uploadId로 메시지 전송"
+                    request {
+                        pathParameter<Int>("roomId") {
+                            description = "채팅방 ID"
+                            required = true
+                        }
+                        body<ChatUploadPrepareRequest> {
+                            description = "종류(VIDEO·FILE), 형식, 크기, 파일명"
+                            required = true
+                        }
                     }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "이미지 파일 없음"
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "업로드 URL 발급 성공"
+                            body<ApiResponse<UploadPrepareResponse>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "크기 초과 또는 지원하지 않는 형식"
+                        }
+                        code(HttpStatusCode.Forbidden) {
+                            description = "채팅방 업로드 권한 없음"
+                        }
                     }
-                    code(HttpStatusCode.NotFound) {
-                        description = "채팅방 없음"
-                    }
-                    code(HttpStatusCode.Forbidden) {
-                        description = "채팅방 업로드 권한 없음"
-                    }
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+
+                    val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
+                        ?: return@post
+
+                    val request = call.receive<ChatUploadPrepareRequest>()
+                    val response = messageService.prepareChatUpload(roomId, userId, request)
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response))
                 }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-
-                val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
-                    ?: return@post
-
-                val (images, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.CHAT_IMAGE)
-
-                if (images.isEmpty()) {
-                    return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES))
-                }
-
-                val uploaded = messageService.uploadChatImages(roomId, userId, images)
-                val response = ChatImageUploadResponse(
-                    imageUrls = uploaded.map { it.first },
-                    thumbnailUrls = uploaded.map { it.second ?: it.first }
-                )
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Common.IMAGE_UPLOADED))
-            }
-
-            post("/{roomId}/uploads", {
-                summary = "채팅 영상·파일 업로드 준비"
-                tags("Messages")
-                description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 uploadId로 메시지 전송"
-                request {
-                    pathParameter<Int>("roomId") {
-                        description = "채팅방 ID"
-                        required = true
-                    }
-                    body<ChatUploadPrepareRequest> {
-                        description = "종류(VIDEO·FILE), 형식, 크기, 파일명"
-                        required = true
-                    }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "업로드 URL 발급 성공"
-                        body<ApiResponse<UploadPrepareResponse>>()
-                    }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "크기 초과 또는 지원하지 않는 형식"
-                    }
-                    code(HttpStatusCode.Forbidden) {
-                        description = "채팅방 업로드 권한 없음"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-
-                val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
-                    ?: return@post
-
-                val request = call.receive<ChatUploadPrepareRequest>()
-                val response = messageService.prepareChatUpload(roomId, userId, request)
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response))
             }
 
             get("/{roomId}/messages", {

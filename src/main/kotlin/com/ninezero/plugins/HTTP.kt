@@ -27,6 +27,7 @@ fun Application.configureHTTP() {
         val authLimit = if (isDev) 1000 else 5
         val authRefreshLimit = if (isDev) 1000 else 30
         val creatorLimit = if (isDev) 100 else 1
+        val uploadLimit = if (isDev) 1000 else 120
         val userOrIpKey: suspend (ApplicationCall) -> Any = { call ->
             call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asInt()
                 ?: call.request.origin.remoteHost
@@ -46,6 +47,10 @@ fun Application.configureHTTP() {
         }
         register(RateLimitName("creator")) {
             rateLimiter(limit = creatorLimit, refillPeriod = 1.hours)
+            requestKey(userOrIpKey)
+        }
+        register(RateLimitName("upload")) {
+            rateLimiter(limit = uploadLimit, refillPeriod = 1.hours)
             requestKey(userOrIpKey)
         }
     }

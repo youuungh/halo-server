@@ -13,6 +13,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -110,34 +111,36 @@ fun Route.profileRoutes() {
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response, Messages.Profile.PROFILE_UPDATED))
             }
 
-            post("/avatar", {
-                summary = "프로필 이미지 업로드"
-                tags("Profile")
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "이미지 업로드 성공"
-                        body<ApiResponse<ProfileResponse>>()
+            rateLimit(RateLimitName("upload")) {
+                post("/avatar", {
+                    summary = "프로필 이미지 업로드"
+                    tags("Profile")
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "이미지 업로드 성공"
+                            body<ApiResponse<ProfileResponse>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "파일이 없거나 잘못된 형식"
+                        }
                     }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "파일이 없거나 잘못된 형식"
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+
+                    val (files, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.AVATAR)
+                    val fileBytes = files.firstOrNull()
+
+                    if (fileBytes == null) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            ApiResponse.error<Unit>(Errors.File.NO_FILE_UPLOADED)
+                        )
                     }
+
+                    val response = profileService.uploadAvatar(userId, fileBytes)
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Profile.AVATAR_UPLOADED))
                 }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-
-                val (files, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.AVATAR)
-                val fileBytes = files.firstOrNull()
-
-                if (fileBytes == null) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiResponse.error<Unit>(Errors.File.NO_FILE_UPLOADED)
-                    )
-                }
-
-                val response = profileService.uploadAvatar(userId, fileBytes)
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Profile.AVATAR_UPLOADED))
             }
         }
     }

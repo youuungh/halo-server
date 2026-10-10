@@ -1,6 +1,7 @@
 package com.ninezero.features.commerce.presentation
 
 import com.ninezero.core.common.config.Constants
+import com.ninezero.core.common.config.DotenvConfig
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.util.ApiResponse
@@ -24,35 +25,38 @@ fun Route.paymentRoutes() {
 
         authenticate("jwt") {
             rateLimit(RateLimitName("payment")) {
-                post({
-                    summary = "Mock 결제"
-                    tags("Payments")
-                    request {
-                        queryParameter<Int>("orderId") {
-                            description = "주문 ID"
-                            required = true
+                // 실결제 없이 결제 완료 처리, 운영 미등록
+                if (!DotenvConfig.isProd) {
+                    post({
+                        summary = "Mock 결제"
+                        tags("Payments")
+                        request {
+                            queryParameter<Int>("orderId") {
+                                description = "주문 ID"
+                                required = true
+                            }
                         }
-                    }
-                    authResponse()
-                    response {
-                        code(HttpStatusCode.BadRequest) {
-                            description = "결제 불가능한 주문 상태"
+                        authResponse()
+                        response {
+                            code(HttpStatusCode.BadRequest) {
+                                description = "결제 불가능한 주문 상태"
+                            }
+                            code(HttpStatusCode.NotFound) {
+                                description = "주문 없음"
+                            }
+                            code(HttpStatusCode.Forbidden) {
+                                description = "결제 권한 없음"
+                            }
                         }
-                        code(HttpStatusCode.NotFound) {
-                            description = "주문 없음"
-                        }
-                        code(HttpStatusCode.Forbidden) {
-                            description = "결제 권한 없음"
-                        }
-                    }
-                }) {
-                    val userId = call.requireUserId() ?: return@post
+                    }) {
+                        val userId = call.requireUserId() ?: return@post
 
-                    val orderId = call.getRequiredIntParam("orderId", Errors.Commerce.Order.INVALID_ORDER_ID)
-                        ?: return@post
+                        val orderId = call.getRequiredIntParam("orderId", Errors.Commerce.Order.INVALID_ORDER_ID)
+                            ?: return@post
 
-                    val response = paymentService.processPayment(orderId, userId)
-                    call.respond(HttpStatusCode.OK, ApiResponse.success(response))
+                        val response = paymentService.processPayment(orderId, userId)
+                        call.respond(HttpStatusCode.OK, ApiResponse.success(response))
+                    }
                 }
 
                 post("/toss/prepare", {

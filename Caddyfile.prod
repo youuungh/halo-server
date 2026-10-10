@@ -1,0 +1,3 @@
+api.haloapp.cc {
+	reverse_proxy hub-api:8080
+}

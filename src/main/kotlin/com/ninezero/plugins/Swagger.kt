@@ -89,7 +89,7 @@ fun Application.configureSwagger() {
             }
 
             get("/") {
-                call.respondRedirect("/swagger/index.html", permanent = true)
+                call.respondRedirect("/swagger/index.html")
             }
         }
     }

@@ -20,6 +20,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -60,76 +61,78 @@ fun Route.mediaDraftRoutes() {
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
-            post("/images", {
-                summary = "이미지 초안 생성"
-                tags("Media Drafts")
-                description = "글·댓글에 붙이기 전에 이미지를 가공해 초안으로 보관, 2시간 안에 게시하지 않으면 삭제"
-                request {
-                    queryParameter<String>("targetType") {
-                        description = "초안이 붙을 대상: POST (글·커뮤니티), COMMENT (댓글), PRODUCT (상품)"
-                        required = true
+            rateLimit(RateLimitName("upload")) {
+                post("/images", {
+                    summary = "이미지 초안 생성"
+                    tags("Media Drafts")
+                    description = "글·댓글에 붙이기 전에 이미지를 가공해 초안으로 보관, 2시간 안에 게시하지 않으면 삭제"
+                    request {
+                        queryParameter<String>("targetType") {
+                            description = "초안이 붙을 대상: POST (글·커뮤니티), COMMENT (댓글), PRODUCT (상품)"
+                            required = true
+                        }
+                        body<ByteArray> {
+                            description = "Multipart form data - 이미지 파일 파트, 순서대로 초안 생성"
+                        }
                     }
-                    body<ByteArray> {
-                        description = "Multipart form data - 이미지 파일 파트, 순서대로 초안 생성"
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "초안 생성 성공"
+                            body<ApiResponse<List<MediaDraftResponse>>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "파일이 없거나 잘못된 이미지, 개수 초과"
+                        }
                     }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "초안 생성 성공"
-                        body<ApiResponse<List<MediaDraftResponse>>>()
-                    }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "파일이 없거나 잘못된 이미지, 개수 초과"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-                val targetType = call.requireDraftTargetType() ?: return@post
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+                    val targetType = call.requireDraftTargetType() ?: return@post
 
-                val (files, contentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST)  // 댓글도 같은 한도
-                if (files.isEmpty()) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES)
-                    )
+                    val (files, contentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST)  // 댓글도 같은 한도
+                    if (files.isEmpty()) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES)
+                        )
+                    }
+
+                    val response = mediaDraftService.createImageDrafts(userId, targetType, files, contentTypes)
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response))
                 }
 
-                val response = mediaDraftService.createImageDrafts(userId, targetType, files, contentTypes)
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response))
-            }
+                post("/videos/uploads", {
+                    summary = "초안 영상 업로드 준비"
+                    tags("Media Drafts")
+                    description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 uploadId로 영상 초안 생성"
+                    request {
+                        queryParameter<String>("targetType") {
+                            description = "초안이 붙을 대상: POST (글·커뮤니티), COMMENT (댓글), PRODUCT (상품)"
+                            required = true
+                        }
+                        body<VideoUploadPrepareRequest> {
+                            description = "영상 형식, 크기"
+                            required = true
+                        }
+                    }
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.Created) {
+                            description = "업로드 URL 발급 성공"
+                            body<ApiResponse<UploadPrepareResponse>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "크기 초과 또는 지원하지 않는 형식"
+                        }
+                    }
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+                    val targetType = call.requireDraftTargetType() ?: return@post
 
-            post("/videos/uploads", {
-                summary = "초안 영상 업로드 준비"
-                tags("Media Drafts")
-                description = "서명된 업로드 URL 발급, 앱이 이 URL로 직접 올린 뒤 uploadId로 영상 초안 생성"
-                request {
-                    queryParameter<String>("targetType") {
-                        description = "초안이 붙을 대상: POST (글·커뮤니티), COMMENT (댓글), PRODUCT (상품)"
-                        required = true
-                    }
-                    body<VideoUploadPrepareRequest> {
-                        description = "영상 형식, 크기"
-                        required = true
-                    }
+                    val request = call.receive<VideoUploadPrepareRequest>()
+                    val response = mediaDraftService.prepareVideoUpload(userId, targetType, request)
+                    call.respond(HttpStatusCode.Created, ApiResponse.success(response))
                 }
-                authResponse()
-                response {
-                    code(HttpStatusCode.Created) {
-                        description = "업로드 URL 발급 성공"
-                        body<ApiResponse<UploadPrepareResponse>>()
-                    }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "크기 초과 또는 지원하지 않는 형식"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-                val targetType = call.requireDraftTargetType() ?: return@post
-
-                val request = call.receive<VideoUploadPrepareRequest>()
-                val response = mediaDraftService.prepareVideoUpload(userId, targetType, request)
-                call.respond(HttpStatusCode.Created, ApiResponse.success(response))
             }
 
             post("/videos", {
