@@ -12,6 +12,9 @@ services:
       POSTGRES_DB: hub
       POSTGRES_USER: ${DATABASE_USER:?}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?}
+    # 서버 자신에서만 열린다. DB 도구는 SSH 터널로 붙는다
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
