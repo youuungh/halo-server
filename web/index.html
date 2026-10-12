@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halo</title>
+<meta property="og:title" content="Halo">
+<meta property="og:description" content="크리에이터의 콘텐츠, 커뮤니티, 스토어를 Halo 앱에서 만날 수 있습니다">
+<meta property="og:type" content="website">
+<style>
+  :root { color-scheme: light dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+    background: #ffffff; color: #111111;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #121212; color: #eeeeee; }
+    .desc { color: #9e9e9e; }
+    .wrap::before, .wrap::after { opacity: 0.22; }
+  }
+  .wrap { position: relative; z-index: 0; text-align: center; padding: 32px; }
+  .wrap::before, .wrap::after {
+    content: ""; position: absolute; z-index: -1; width: 280px; height: 280px; border-radius: 50%;
+    top: 50%; left: 50%; filter: blur(64px); opacity: 0.26;
+  }
+  .wrap::before { transform: translate(-72%, -54%); background: #1a73e8; }
+  .wrap::after { transform: translate(-28%, -46%); background: #8a63e8; }
+  .logo { font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 16px; }
+  .desc { font-size: 15px; color: #666666; line-height: 1.6; }
+  .btn {
+    display: inline-block; margin-top: 28px; padding: 14px 40px; border-radius: 24px;
+    background: #1a73e8; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">halo</div>
+  <p class="desc">이 콘텐츠는 Halo 앱에서 볼 수 있습니다.<span id="hint"><br>앱이 설치되어 있다면 아래 버튼으로 열 수 있습니다.</span></p>
+  <a class="btn" id="open" href="halo://">앱에서 열기</a>
+</div>
+<script>
+  var repo = "https://github.com/youuungh/halo-app";
+  var m = location.pathname.match(/^\/(post|product|profile)\/(\d+)\/?$/);
+  var path = m ? m[1] + "/" + m[2] : "";
+  var btn = document.getElementById("open");
+  if (/Android/i.test(navigator.userAgent)) {
+    // 앱이 없으면 저장소로 보낸다
+    btn.href = "intent://" + path + "#Intent;scheme=halo;S.browser_fallback_url=" + encodeURIComponent(repo) + ";end";
+    if (m) location.href = "halo://" + path;
+  } else {
+    btn.href = repo;
+    btn.textContent = "GitHub에서 보기";
+    document.getElementById("hint").remove();
+  }
+</script>
+</body>
+</html>

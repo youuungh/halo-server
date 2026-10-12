@@ -1,0 +1,27 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ninezero.halo",
+      "sha256_cert_fingerprints": [
+        "7E:10:F8:26:3F:31:FB:8A:33:F1:D7:00:B0:5D:04:D1:2C:D1:0A:CD:30:A1:CE:E6:3F:A8:46:50:3A:BC:C0:28",
+        "E8:C0:F0:1A:9D:6C:6E:FF:ED:A0:05:53:6D:C0:1A:7C:06:97:A5:AA:AA:38:17:8A:09:6C:C0:BB:87:37:17:BC"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ninezero.halo.flutter",
+      "sha256_cert_fingerprints": [
+        "7E:10:F8:26:3F:31:FB:8A:33:F1:D7:00:B0:5D:04:D1:2C:D1:0A:CD:30:A1:CE:E6:3F:A8:46:50:3A:BC:C0:28"
+      ]
+    }
+  }
+]
