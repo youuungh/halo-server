@@ -26,6 +26,7 @@ object ValidationUtils {
     private val USERNAME_REGEX = Regex("^[a-z0-9_]+$")
     private val PHONE_REGEX = Regex("^\\d{2,3}-\\d{3,4}-\\d{4}$")
     private val TAG_NAME_REGEX = Regex("^[가-힣a-zA-Z0-9\\s]+$")
+    private val TRACKING_NUMBER_REGEX = Regex("^[0-9]+$")
     private val COUPON_CODE_REGEX = Constants.Coupon.CODE_PATTERN.toRegex()
 
     // User 관련 검증
@@ -386,12 +387,18 @@ object ValidationUtils {
         }
     }
 
+    /** 하이픈·공백을 뺀 송장번호 저장 형태 */
+    fun normalizeTrackingNumber(trackingNumber: String): String =
+        trackingNumber.filterNot { it == '-' || it.isWhitespace() }
+
     fun validateTrackingNumber(trackingNumber: String) {
         when {
             trackingNumber.length < Constants.Commerce.TRACKING_NUMBER_MIN_LENGTH ->
                 throw InvalidInputException("송장번호는 최소 ${Constants.Commerce.TRACKING_NUMBER_MIN_LENGTH}자 이상이어야 합니다.")
             trackingNumber.length > Constants.Commerce.TRACKING_NUMBER_MAX_LENGTH ->
                 throw InvalidInputException("송장번호는 최대 ${Constants.Commerce.TRACKING_NUMBER_MAX_LENGTH}자까지 입력 가능합니다.")
+            !TRACKING_NUMBER_REGEX.matches(trackingNumber) ->
+                throw InvalidInputException("송장번호는 숫자만 입력할 수 있습니다.")
         }
     }
 

@@ -49,6 +49,9 @@ class OrderShippingService(
         val TRACKING_WEBHOOK_EVENTS = setOf("tracking.polled", "tracking.completed")  // polled는 변화 없어도 매시간 옴
     }
 
+    /** 송장 저장 결과 — 첫 등록·수정·같은 값 */
+    private enum class ShippingInfoChange { REGISTERED, CHANGED, UNCHANGED }
+
     private data class TrackingRetryRef(
         val orderId: Int,
         val creatorId: Int,
@@ -62,10 +65,11 @@ class OrderShippingService(
         orderId: Int,
         request: UpdateShippingRequest
     ): OrderResponse {
-        ValidationUtils.validateTrackingNumber(request.trackingNumber)
+        val trackingNumber = ValidationUtils.normalizeTrackingNumber(request.trackingNumber)
+        ValidationUtils.validateTrackingNumber(trackingNumber)
         ValidationUtils.validateCarrier(request.carrier)
 
-        val (response, buyerId) = query {
+        val (response, buyerId, change) = query {
             val order = lockOrder(orderId)  // 취소와 직렬화
 
             val shipment = orderRepository.findCreatorShipment(orderId, userId)
@@ -76,8 +80,27 @@ class OrderShippingService(
                 throw ShippingInfoUpdateFailedException(Errors.Commerce.Order.Shipping.SHIPPING_INFO_UPDATE_FAILED)
             }
 
-            if (shipment.shippingStatus != ShippingStatus.PREPARING) {  // PREPARING 상태에서만 가능
-                throw ShippingAlreadyStartedException(Errors.Commerce.Order.Shipping.ALREADY_SHIPPED)
+            // 택배사 기록이 생기기 전(SHIPPED)까지는 송장 수정 허용
+            val change = when (shipment.shippingStatus) {
+                ShippingStatus.PREPARING -> ShippingInfoChange.REGISTERED
+                ShippingStatus.SHIPPED ->
+                    if (shipment.trackingNumber == trackingNumber && shipment.carrier == request.carrier) {
+                        ShippingInfoChange.UNCHANGED
+                    } else {
+                        ShippingInfoChange.CHANGED
+                    }
+                else -> throw ShippingAlreadyStartedException(Errors.Commerce.Order.Shipping.ALREADY_SHIPPED)
+            }
+
+            val payment = paymentRepository.findByOrderId(orderId)
+            if (change == ShippingInfoChange.UNCHANGED) {
+                return@query Triple(
+                    orderResponseAssembler.buildOrderResponseInTransaction(
+                        order, orderResponseAssembler.fetchOrderItemsWithProducts(orderId).itemsWithProducts, payment, viewerCreatorId = userId
+                    ),
+                    order.userId,
+                    change
+                )
             }
 
             val estimatedDeliveryDate = calcEstimatedDeliveryDate(request.carrier)
@@ -85,7 +108,7 @@ class OrderShippingService(
             orderRepository.updateShippingInfo(
                 orderId = orderId,
                 creatorId = userId,
-                trackingNumber = request.trackingNumber,
+                trackingNumber = trackingNumber,
                 carrier = request.carrier,
                 shippingStatus = ShippingStatus.SHIPPED,
                 estimatedDeliveryDate = estimatedDeliveryDate
@@ -99,21 +122,35 @@ class OrderShippingService(
             val shipmentsAfter = orderRepository.findOrderShipments(orderId)
             mergeOrderState(order, shipmentsAfter)
 
-            val payment = paymentRepository.findByOrderId(orderId)
-            orderResponseAssembler.buildOrderResponseInTransaction(
-                order, orderResponseAssembler.fetchOrderItemsWithProducts(orderId).itemsWithProducts, payment, viewerCreatorId = userId
-            ) to order.userId
+            Triple(
+                orderResponseAssembler.buildOrderResponseInTransaction(
+                    order, orderResponseAssembler.fetchOrderItemsWithProducts(orderId).itemsWithProducts, payment, viewerCreatorId = userId
+                ),
+                order.userId,
+                change
+            )
         }
+
+        if (change == ShippingInfoChange.UNCHANGED) return response
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendShippingStartedNotification(
-                    userId = buyerId,
-                    orderId = orderId,
-                    trackingNumber = request.trackingNumber
-                )
+                if (change == ShippingInfoChange.CHANGED) {
+                    notificationService.sendTrackingChangedNotification(
+                        userId = buyerId,
+                        orderId = orderId,
+                        carrier = request.carrier,
+                        trackingNumber = trackingNumber
+                    )
+                } else {
+                    notificationService.sendShippingStartedNotification(
+                        userId = buyerId,
+                        orderId = orderId,
+                        trackingNumber = trackingNumber
+                    )
+                }
             } catch (e: Exception) {
-                logger.error("배송 시작 알림 전송 실패: orderId=$orderId, error=${e.message}", e)
+                logger.error("송장 알림 전송 실패: orderId=$orderId, error=${e.message}", e)
             }
         }
 
@@ -121,7 +158,7 @@ class OrderShippingService(
             orderId = orderId,
             creatorId = userId,
             carrier = request.carrier,
-            trackingNumber = request.trackingNumber
+            trackingNumber = trackingNumber
         )
 
         return response

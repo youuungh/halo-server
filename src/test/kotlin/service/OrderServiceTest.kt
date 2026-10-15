@@ -40,6 +40,7 @@ import com.ninezero.core.common.exception.PaymentResultUnknownException
 import com.ninezero.core.common.exception.ForbiddenException
 import com.ninezero.core.common.exception.ProductInactiveException
 import com.ninezero.core.common.exception.ProductSoldOutException
+import com.ninezero.core.common.exception.ShippingAlreadyStartedException
 import com.ninezero.core.common.exception.ShippingStatusUpdateFailedException
 import com.ninezero.core.common.exception.SubscriptionRequiredException
 import com.ninezero.features.commerce.data.BillingKeyRepositoryImpl
@@ -1471,6 +1472,73 @@ class OrderServiceTest {
                 orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest(TRACKING_NUMBER, CARRIER))
             }
             assertNull(query { shipmentOf(order.id.value).trackingNumber })
+        }
+    }
+
+    @Test
+    fun `송장번호는 하이픈과 공백을 빼고 저장하고 숫자가 아니면 거절한다`() {
+        runBlocking {
+            val creator = TestFixtures.createTestCreator()
+            val user = TestFixtures.createTestUser()
+            val product = TestFixtures.createTestProduct(creator.id.value)
+            val order = TestFixtures.createTestOrder(user.id.value, product.id.value, paymentStatus = PaymentStatus.COMPLETED)
+
+            assertFailsWith<InvalidInputException> {
+                orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest("ABCD123456", CARRIER))
+            }
+            assertNull(query { shipmentOf(order.id.value).trackingNumber })
+
+            orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest("6082-2509 40706", CARRIER))
+            assertEquals("6082250940706", query { shipmentOf(order.id.value).trackingNumber })
+        }
+    }
+
+    @Test
+    fun `택배사 기록 전까지 송장을 수정하면 새 번호로 추적하고 변경 알림을 보낸다`() {
+        runBlocking {
+            clearMocks(notificationService)
+            val creator = TestFixtures.createTestCreator()
+            val user = TestFixtures.createTestUser()
+            val product = TestFixtures.createTestProduct(creator.id.value)
+            val order = TestFixtures.createTestOrder(user.id.value, product.id.value, paymentStatus = PaymentStatus.COMPLETED)
+            val clientId = "${order.id.value}:${creator.id.value}"
+            orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest(TRACKING_NUMBER, CARRIER))
+
+            // 같은 값이면 그대로
+            orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest(TRACKING_NUMBER, CARRIER))
+            coVerify(exactly = 1) { deliveryApiClient.subscribeTracking(COURIER_CODE, TRACKING_NUMBER, clientId) }
+
+            val response = orderShippingService.updateShippingInfo(
+                creator.id.value, order.id.value, UpdateShippingRequest("9876543210", "한진택배")
+            )
+
+            assertEquals("9876543210", response.trackingNumber)
+            assertEquals("한진택배", response.carrier)
+            assertEquals(ShippingStatus.SHIPPED, response.shippingStatus)
+            coVerify(exactly = 1) { deliveryApiClient.subscribeTracking(COURIER_CODE, "9876543210", clientId) }
+            coVerify(exactly = 1) {
+                notificationService.sendShippingStartedNotification(user.id.value, order.id.value, TRACKING_NUMBER)
+            }
+            coVerify(exactly = 1) {
+                notificationService.sendTrackingChangedNotification(user.id.value, order.id.value, "한진택배", "9876543210")
+            }
+        }
+    }
+
+    @Test
+    fun `택배사가 물건을 받은 뒤에는 송장을 수정할 수 없다`() {
+        runBlocking {
+            val creator = TestFixtures.createTestCreator()
+            val user = TestFixtures.createTestUser()
+            val product = TestFixtures.createTestProduct(creator.id.value)
+            val order = TestFixtures.createTestOrder(user.id.value, product.id.value, paymentStatus = PaymentStatus.COMPLETED)
+            orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest(TRACKING_NUMBER, CARRIER))
+            query { shipmentOf(order.id.value).shippingStatus = ShippingStatus.IN_TRANSIT }
+
+            assertFailsWith<ShippingAlreadyStartedException> {
+                orderShippingService.updateShippingInfo(creator.id.value, order.id.value, UpdateShippingRequest("9876543210", CARRIER))
+            }
+            assertEquals(TRACKING_NUMBER, query { shipmentOf(order.id.value).trackingNumber })
         }
     }
 

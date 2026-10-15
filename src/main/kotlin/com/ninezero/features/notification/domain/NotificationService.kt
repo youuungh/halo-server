@@ -493,6 +493,26 @@ class NotificationService(
         }
     }
 
+    suspend fun sendTrackingChangedNotification(
+        userId: Int,
+        orderId: Int,
+        carrier: String,
+        trackingNumber: String
+    ): NotificationResponse {
+        return createAndSendNotification {
+            NotificationDraft(
+                recipientId = userId,
+                senderId = null,
+                type = NotificationType.SHIPPING_STARTED,
+                title = "송장번호가 변경되었습니다",
+                message = "주문하신 상품의 송장번호가 변경되었습니다. $carrier $trackingNumber",
+                targetType = NotificationTargetType.ORDER,
+                targetId = orderId,
+                deepLink = "/orders/$orderId"
+            )
+        }
+    }
+
     suspend fun sendShippingInTransitNotification(
         userId: Int,
         orderId: Int,

@@ -354,7 +354,7 @@ fun Route.orderRoutes() {
             }
 
             put("/{id}/shipping", {
-                summary = "배송 정보 등록 (Creator)"
+                summary = "배송 정보 등록·수정 (Creator)"
                 tags("Orders")
                 request {
                     pathParameter<Int>("id") {
