@@ -3,6 +3,7 @@ package com.ninezero.features.commerce.domain
 import com.ninezero.core.common.config.OrderStatus
 import com.ninezero.core.common.config.ShippingStatus
 import com.ninezero.core.common.config.SubscriptionPlanTier
+import com.ninezero.core.common.util.TierAccessEvaluator
 import com.ninezero.core.common.util.calcEarnByTier
 import com.ninezero.core.common.util.decodeJsonToList
 import com.ninezero.core.common.util.getEarnRateForTier
@@ -12,6 +13,7 @@ import com.ninezero.core.database.entities.commerce.OrderItemDao
 import com.ninezero.core.database.entities.commerce.OrderShipmentDao
 import com.ninezero.core.database.entities.commerce.PaymentDao
 import com.ninezero.core.database.entities.commerce.ProductDao
+import com.ninezero.core.database.entities.subscription.SubscriptionDao
 import com.ninezero.features.commerce.data.OrderItemWithProduct
 import com.ninezero.features.commerce.data.OrderRepository
 import com.ninezero.features.commerce.data.OrderWithItems
@@ -23,6 +25,7 @@ import com.ninezero.features.commerce.presentation.models.response.OrderItemResp
 import com.ninezero.features.commerce.presentation.models.response.OrderResponse
 import com.ninezero.features.commerce.toOrderItemResponse
 import com.ninezero.features.commerce.toOrderResponse
+import com.ninezero.features.subscription.data.SubscriptionPlanRepository
 import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.data.UserRepository
 import java.math.BigDecimal
@@ -34,7 +37,8 @@ class OrderResponseAssembler(
     private val reviewRepository: ReviewRepository,
     private val userRepository: UserRepository,
     private val paymentRepository: PaymentRepository,
-    private val subscriptionRepository: SubscriptionRepository
+    private val subscriptionRepository: SubscriptionRepository,
+    private val planRepository: SubscriptionPlanRepository
 ) {
 
     data class OrderItemsWithProducts(
@@ -71,6 +75,8 @@ class OrderResponseAssembler(
         viewerCreatorId: Int? = null
     ): OrderResponse {
         val creatorIds = itemsWithProducts.mapNotNull { it.product?.creatorId }.distinct()
+        // 구독 뱃지·상품 접근은 현재 기준
+        val subscriptions = subscriptionRepository.findActiveSubscriptionsByCreators(order.userId, creatorIds)
         return assembleOrderResponse(
             order = order,
             itemsWithProducts = itemsWithProducts,
@@ -79,10 +85,8 @@ class OrderResponseAssembler(
             creatorInfoMap = findCreatorInfoMap(creatorIds),
             reviewIdByProduct = reviewRepository.findReviewIdsByOrder(order.id.value),
             shipments = orderRepository.findOrderShipments(order.id.value),
-            // 구독 뱃지는 현재 기준
-            subscribedCreatorIds = subscriptionRepository.findActiveSubscriptionsByCreators(order.userId, creatorIds)
-                .map { it.creatorId }
-                .toSet()
+            subscribedCreatorIds = subscriptions.map { it.creatorId }.toSet(),
+            creatorTierMap = creatorTierMapOf(subscriptions, findPlanTierMap(subscriptions))
         )
     }
 
@@ -97,13 +101,15 @@ class OrderResponseAssembler(
         val creatorInfoMap = findCreatorInfoMap(creatorIds)
         val reviewIdsByOrder = reviewRepository.findReviewIdsByOrders(orderIds)
         val shipmentsByOrder = orderRepository.findOrderShipments(orderIds)
-        // 구독 뱃지는 현재 기준, 판매자 목록은 주문마다 구매자가 다름
-        val subscribedCreatorIdsByUser = subscriptionRepository
+        // 구독 뱃지·상품 접근은 현재 기준, 판매자 목록은 주문마다 구매자가 다름
+        val subscriptions = subscriptionRepository
             .findActiveSubscriptionsByCreators(ordersWithItems.map { it.order.userId }.distinct(), creatorIds)
-            .groupBy({ it.userId }, { it.creatorId })
+        val subscriptionsByUser = subscriptions.groupBy { it.userId }
+        val planTierMap = findPlanTierMap(subscriptions)
 
         return ordersWithItems.map { (order, itemsWithProducts) ->
             val orderId = order.id.value
+            val buyerSubscriptions = subscriptionsByUser[order.userId].orEmpty()
             assembleOrderResponse(
                 order = order,
                 itemsWithProducts = itemsWithProducts,
@@ -112,7 +118,8 @@ class OrderResponseAssembler(
                 creatorInfoMap = creatorInfoMap,
                 reviewIdByProduct = reviewIdsByOrder[orderId].orEmpty(),
                 shipments = shipmentsByOrder[orderId].orEmpty(),
-                subscribedCreatorIds = subscribedCreatorIdsByUser[order.userId].orEmpty().toSet()
+                subscribedCreatorIds = buyerSubscriptions.map { it.creatorId }.toSet(),
+                creatorTierMap = creatorTierMapOf(buyerSubscriptions, planTierMap)
             )
         }
     }
@@ -124,6 +131,21 @@ class OrderResponseAssembler(
         }
     }
 
+    // 플랜별 티어
+    private suspend fun findPlanTierMap(subscriptions: List<SubscriptionDao>): Map<Int, SubscriptionPlanTier> {
+        if (subscriptions.isEmpty()) return emptyMap()
+        return planRepository.findPlansByIds(subscriptions.map { it.planId }.distinct())
+            .associate { it.id.value to it.tier }
+    }
+
+    // 구독 중인 크리에이터별 티어
+    private fun creatorTierMapOf(
+        subscriptions: List<SubscriptionDao>,
+        planTierMap: Map<Int, SubscriptionPlanTier>
+    ): Map<Int, SubscriptionPlanTier> = subscriptions.mapNotNull { subscription ->
+        planTierMap[subscription.planId]?.let { subscription.creatorId to it }
+    }.toMap()
+
     private fun assembleOrderResponse(
         order: OrderDao,
         itemsWithProducts: List<OrderItemWithProduct>,
@@ -132,12 +154,23 @@ class OrderResponseAssembler(
         creatorInfoMap: Map<Int, CreatorInfo>,
         reviewIdByProduct: Map<Int, Int>,
         shipments: List<OrderShipmentDao>,
-        subscribedCreatorIds: Set<Int>
+        subscribedCreatorIds: Set<Int>,
+        creatorTierMap: Map<Int, SubscriptionPlanTier>
     ): OrderResponse {
         val itemResponses = itemsWithProducts.map { itemWithProduct ->
             val imageList = itemWithProduct.product?.imageUrls?.decodeJsonToList().orEmpty()
             val reviewId = reviewIdByProduct[itemWithProduct.orderItem.productId]
-            val creatorInfo = itemWithProduct.product?.creatorId?.let { creatorInfoMap[it] }
+            val product = itemWithProduct.product
+            val creatorInfo = product?.creatorId?.let { creatorInfoMap[it] }
+            // 판매자 조회는 자기 상품이라 항상 허용
+            val canAccess = viewerCreatorId != null || product == null || TierAccessEvaluator.canAccess(
+                viewerId = order.userId,
+                ownerId = product.creatorId,
+                creatorId = product.creatorId,
+                requiredTier = product.requiredTier,
+                isSecret = false,
+                viewerTier = creatorTierMap[product.creatorId]
+            )
             itemWithProduct.orderItem.toOrderItemResponse(
                 // 삭제 상품도 실명 유지
                 productName = itemWithProduct.product?.name ?: "삭제된 상품",
@@ -147,7 +180,9 @@ class OrderResponseAssembler(
                 creatorAvatarUrl = creatorInfo?.avatarUrl,
                 hasReview = reviewId != null,
                 reviewId = reviewId,
-                isProductActive = itemWithProduct.product?.isActive ?: false
+                isProductActive = itemWithProduct.product?.isActive ?: false,
+                requiredTier = product?.requiredTier ?: SubscriptionPlanTier.FREE,
+                canAccess = canAccess
             )
         }
 

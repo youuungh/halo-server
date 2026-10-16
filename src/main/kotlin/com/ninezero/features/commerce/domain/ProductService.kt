@@ -162,10 +162,13 @@ class ProductService(
     suspend fun getProductById(productId: Int, currentUserId: Int?): ProductResponse {
         val cacheKey = CacheKeys.product(productId, currentUserId)
         cacheService.getJson<ProductResponse>(cacheKey)?.let { cached ->
-            // 캐시는 작성자·접근권만 쓰고 상품은 새로 조회
+            // 캐시는 작성자·접근권만 쓰고 상품·섹션 태그는 새로 조회
             val refreshed = query {
-                productRepository.findProductById(productId)
-                    ?.toProductResponse(cached.creator, canAccess = cached.canAccess)
+                productRepository.findProductById(productId)?.toProductResponse(
+                    cached.creator,
+                    canAccess = cached.canAccess,
+                    sectionTag = findSectionTag(productId)
+                )
             }
             if (refreshed != null) return refreshed
         }
@@ -183,13 +186,17 @@ class ProductService(
 
             productRepository.incrementViewCount(productId)
 
-            product.toProductResponse(creator, canAccess = hasAccess)
+            // 수정 화면이 이 값으로 섹션 태그를 채움
+            product.toProductResponse(creator, canAccess = hasAccess, sectionTag = findSectionTag(productId))
         }
 
         cacheService.setJson(cacheKey, response, ttl = 30.minutes)
 
         return response
     }
+
+    private suspend fun findSectionTag(productId: Int) =
+        tagRepository.findSectionTagsByProducts(listOf(productId))[productId]?.toTagResponse()
 
     suspend fun getAllProducts(
         page: Int = 1,

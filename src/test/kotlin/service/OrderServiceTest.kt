@@ -185,7 +185,8 @@ class OrderServiceTest {
                 reviewRepository = reviewRepository,
                 userRepository = UserRepositoryImpl(),
                 paymentRepository = paymentRepository,
-                subscriptionRepository = SubscriptionRepositoryImpl()
+                subscriptionRepository = SubscriptionRepositoryImpl(),
+                planRepository = subscriptionPlanRepository
             )
 
             // OrderService 초기화

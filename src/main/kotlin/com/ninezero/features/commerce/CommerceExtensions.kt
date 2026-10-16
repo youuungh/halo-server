@@ -157,7 +157,9 @@ fun OrderItemDao.toOrderItemResponse(
     creatorAvatarUrl: String? = null,
     hasReview: Boolean = false,
     reviewId: Int? = null,
-    isProductActive: Boolean = true
+    isProductActive: Boolean = true,
+    requiredTier: SubscriptionPlanTier = SubscriptionPlanTier.FREE,
+    canAccess: Boolean = true
 ): OrderItemResponse {
     val subtotal = price.multiply(BigDecimal(quantity))
 
@@ -175,7 +177,9 @@ fun OrderItemDao.toOrderItemResponse(
         creatorAvatarUrl = creatorAvatarUrl,
         hasReview = hasReview,
         reviewId = reviewId,
-        isProductActive = isProductActive
+        isProductActive = isProductActive,
+        requiredTier = requiredTier,
+        canAccess = canAccess
     )
 }
 

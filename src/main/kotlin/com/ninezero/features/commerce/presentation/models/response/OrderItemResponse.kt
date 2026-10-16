@@ -1,5 +1,6 @@
 package com.ninezero.features.commerce.presentation.models.response
 
+import com.ninezero.core.common.config.SubscriptionPlanTier
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -17,5 +18,7 @@ data class OrderItemResponse(
     val creatorAvatarUrl: String? = null,
     val hasReview: Boolean = false,
     val reviewId: Int? = null,
-    val isProductActive: Boolean = true  // 판매 가능 여부, 삭제 시 false
+    val isProductActive: Boolean = true,  // 판매 가능 여부, 삭제 시 false
+    val requiredTier: SubscriptionPlanTier = SubscriptionPlanTier.FREE,
+    val canAccess: Boolean = true  // 구매자 현재 구독 기준
 )
