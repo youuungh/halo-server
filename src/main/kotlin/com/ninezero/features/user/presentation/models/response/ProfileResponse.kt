@@ -22,11 +22,11 @@ data class ProfileResponse(
     val subscriberCount: Int? = null,
     val hasSubscriptionPlans: Boolean = false,
     val isCreator: Boolean = false,
-    /** 양방향 차단 여부 */
     val isBlocked: Boolean = false,
     val isBlockedByMe: Boolean = false,
     val isBlockedByOther: Boolean = false,
     val isFollowing: Boolean = false,
+    val isSubscribed: Boolean = false,
     val notifyNewPost: Boolean = false,
     val notifyNewProduct: Boolean = false,
     val createdAt: LocalDateTime,

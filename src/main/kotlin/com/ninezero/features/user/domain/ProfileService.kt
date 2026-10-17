@@ -59,6 +59,7 @@ class ProfileService(
             cacheService.getJson<ProfileResponse>(cacheKey)?.let {
                 return it.copy(
                     isFollowing = isFollowing,
+                    isSubscribed = isSubscribedTo(it, currentUserId),
                     notifyNewPost = notifySettings?.first ?: false,
                     notifyNewProduct = notifySettings?.second ?: false
                 )
@@ -108,9 +109,15 @@ class ProfileService(
 
         return response.copy(
             isFollowing = isFollowing,
+            isSubscribed = isSubscribedTo(response, currentUserId),
             notifyNewPost = notifySettings?.first ?: false,
             notifyNewProduct = notifySettings?.second ?: false
         )
+    }
+
+    private suspend fun isSubscribedTo(profile: ProfileResponse, currentUserId: Int?): Boolean {
+        if (currentUserId == null || currentUserId == profile.userId || !profile.isCreator) return false
+        return query { subscriptionRepository.findActiveSubscription(currentUserId, profile.userId) } != null
     }
 
     suspend fun updateProfile(userId: Int, request: UpdateProfileRequest): ProfileResponse {
