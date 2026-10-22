@@ -126,7 +126,6 @@ class CommunityServiceTest {
                 likeRepository = likeRepository,
                 bookmarkRepository = bookmarkRepository,
                 followRepository = followRepository,
-                hiddenPostRepository = HiddenPostRepositoryImpl(),
                 blockedUserRepository = BlockedUserRepositoryImpl(),
                 postService = postService,
                 postMediaService = postMediaService,
@@ -365,7 +364,7 @@ class CommunityServiceTest {
     }
 
     @Test
-    fun `커뮤니티 목록에서 차단 관계 사용자의 글과 관심없음 처리한 글은 빠진다`() {
+    fun `커뮤니티 목록에서 차단 관계 사용자의 글은 빠지고 관심없음 처리한 글은 남는다`() {
         runBlocking {
             val creator = TestFixtures.createTestCreator()
             val (viewer, blockedFan, fan) = TestFixtures.createTestUsers(count = 3)
@@ -382,10 +381,10 @@ class CommunityServiceTest {
                 HiddenPostRepositoryImpl().createHiddenPost(viewer.id.value, hiddenPost.id)
             }
 
-            // 빠진 글이 최신이어도 한 페이지는 남은 글로 채움
-            val response = communityService.getCommunityPosts(creator.id.value, viewer.id.value, limit = 1)
+            // 빠진 글이 최신이어도 한 페이지는 남은 글로 채움, 관심없음은 피드에서만
+            val response = communityService.getCommunityPosts(creator.id.value, viewer.id.value, limit = 2)
 
-            assertEquals(listOf(visiblePost.id), response.posts.items.map { it.id })
+            assertEquals(listOf(hiddenPost.id, visiblePost.id), response.posts.items.map { it.id })
             assertEquals(false, response.posts.hasNext)
         }
     }

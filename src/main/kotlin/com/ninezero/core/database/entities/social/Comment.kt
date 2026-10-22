@@ -16,7 +16,7 @@ object CommentTable : BaseIntIdTable("comments") {
     val isActive = bool("is_active").default(true)
     val isBlinded = bool("is_blinded").default(false)
     val moderationLocked = bool("moderation_locked").default(false)
-    val isDeleted = bool("is_deleted").default(false)  // 작성자가 지웠지만 답글이 남아 자리만 표시
+    val isDeleted = bool("is_deleted").default(false)  // 지워지거나 블라인드됐지만 답글이 남아 자리만 표시
     val clientRequestId = varchar("client_request_id", 64).nullable()  // 앱 작성 요청 식별자, 같은 요청이 반복돼도 댓글은 하나
 
     init {

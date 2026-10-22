@@ -102,6 +102,29 @@ class ChatServiceTest {
         }
     }
 
+    @Test
+    fun `채팅방 조회 - 방향별 차단 여부 포함`() {
+        runBlocking {
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = chatService.getOrCreateChatRoom(user1.id.value, user2.id.value)
+            query { chatRepository.updateChatRoom(chatRoom.id, user1.id.value, "hi") }
+
+            query { blockedUserRepository.createBlock(user1.id.value, user2.id.value) }
+
+            val mine = chatService.getChatRoomById(chatRoom.id, user1.id.value)
+            assertEquals(true, mine.isBlockedByMe)
+            assertEquals(false, mine.isBlockedByOther)
+
+            val theirs = chatService.getMyChatRooms(user2.id.value, false, 1, 10).items.single()
+            assertEquals(false, theirs.isBlockedByMe)
+            assertEquals(true, theirs.isBlockedByOther)
+
+            val found = chatService.findChatRoomWithUser(user1.id.value, user2.id.value)
+            assertEquals(true, found?.isBlockedByMe)
+        }
+    }
+
     // ===== 채팅방 보관 테스트 =====
 
     @Test

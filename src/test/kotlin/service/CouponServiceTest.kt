@@ -729,7 +729,7 @@ class CouponServiceTest {
     }
 
     @Test
-    fun `내 쿠폰 목록 조회 - 발행 쿠폰이 비활성화되면 미사용 쿠폰은 지갑에서 제외`() {
+    fun `내 쿠폰 목록 조회 - 발행 쿠폰이 비활성화돼도 받은 쿠폰은 지갑에 남는다`() {
         runBlocking {
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
@@ -755,27 +755,26 @@ class CouponServiceTest {
                 couponService.claimCoupon(user.id.value, "DEADCOUPON$i")
             }
 
-            // 하나는 사용 처리 — 사용완료 기록은 발행 쿠폰이 죽어도 유지돼야 한다
+            // 하나는 사용 처리
             query {
                 val usedCoupon = couponRepository.findByCode("DEADCOUPON0")!!
                 val userCoupon = userCouponRepository.findByUserIdAndCouponId(user.id.value, usedCoupon.id.value)!!
                 userCouponRepository.markAsUsed(userCoupon.id.value, orderId = 1)
             }
 
-            // 크리에이터 해제/탈퇴 teardown과 동일 경로로 발행 쿠폰 전체 비활성화
+            // 비활성 = 발급 중지, 크리에이터 해제/탈퇴 teardown과 같은 경로
             query { couponRepository.disableActiveCouponsByCreator(creator.id.value) }
 
-            // 사용가능 칩·카운트: 죽은 미사용 쿠폰 제외 → 0
+            // 사용가능 칩·카운트: 받은 미사용 쿠폰은 그대로 → 1
             val available = couponService.getMyCouponList(
                 userId = user.id.value, page = 1, limit = 10, status = UserCouponStatus.AVAILABLE
             )
-            assertEquals(0, available.coupons.items.size)
-            assertEquals(0, available.availableCount)
+            assertEquals(listOf("DEADCOUPON1"), available.coupons.items.map { it.coupon.code })
+            assertEquals(1, available.availableCount)
 
-            // 전체 칩: 미사용 죽은 쿠폰은 제외, 사용완료 기록은 유지 → 1
+            // 전체 칩: 미사용·사용완료 모두 유지 → 2
             val all = couponService.getMyCouponList(userId = user.id.value, page = 1, limit = 10)
-            assertEquals(1, all.coupons.totalCount)
-            assertTrue(all.coupons.items.all { it.status == UserCouponStatus.USED })
+            assertEquals(2, all.coupons.totalCount)
         }
     }
 

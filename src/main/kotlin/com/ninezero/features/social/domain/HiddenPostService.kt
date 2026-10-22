@@ -30,7 +30,7 @@ class HiddenPostService(
             )
         }
 
-        // 숨긴 글이 남은 본인 탐색·커뮤니티 캐시
+        // 숨긴 글이 남은 본인 탐색 캐시
         cacheService.deletePattern(CacheKeys.Patterns.userScoped(userId))
 
         return response

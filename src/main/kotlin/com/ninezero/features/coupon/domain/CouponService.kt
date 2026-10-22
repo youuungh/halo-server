@@ -159,6 +159,14 @@ class CouponService(
                 throw InvalidInputException(Errors.Coupon.TOTAL_QUANTITY_BELOW_ISSUED)
             }
 
+            // 받은 사람이 있으면 사용 조건 고정, 앱은 전체 값을 보내므로 바뀐 것만 막음
+            val changesTerms = (minOrderAmount != null && !isSameAmount(minOrderAmount, coupon.minOrderAmount)) ||
+                    (request.maxDiscountAmount != null && !isSameAmount(maxDiscountAmount, coupon.maxDiscountAmount)) ||
+                    (request.maxUseCount != null && request.maxUseCount != coupon.maxUseCount)
+            if (coupon.issuedQuantity > 0 && changesTerms) {
+                throw InvalidInputException(Errors.Coupon.TERMS_LOCKED_AFTER_ISSUE)
+            }
+
             // 한쪽만 바꿔도 저장값과 합쳐 기간 검증
             if (request.startDate != null || request.endDate != null) {
                 ValidationUtils.validateDateRange(request.startDate ?: coupon.startDate, request.endDate ?: coupon.endDate)
@@ -299,4 +307,8 @@ class CouponService(
                 user.id.value to name
             }
     }
+
+    // 소수 자릿수 무관 금액 비교, 둘 다 없으면 같음
+    private fun isSameAmount(a: BigDecimal?, b: BigDecimal?): Boolean =
+        if (a == null || b == null) a == b else a.compareTo(b) == 0
 }

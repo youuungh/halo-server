@@ -22,7 +22,7 @@ interface CommentRepository {
     // 댓글 조회
     suspend fun findCommentById(commentId: Int): CommentDao?
     suspend fun findCommentByClientRequestId(userId: Int, clientRequestId: String): CommentDao?
-    suspend fun findThreadCommentById(commentId: Int): CommentDao?
+    suspend fun findThreadCommentById(commentId: Int, viewerId: Int?): CommentDao?
     suspend fun hasThreadReplies(commentId: Int): Boolean
     suspend fun findCommentsByPostId(
         postId: Int,
@@ -60,4 +60,5 @@ interface CommentRepository {
     suspend fun decrementLikeCount(commentId: Int): Boolean
     suspend fun incrementRepliesCount(commentId: Int): Boolean
     suspend fun decrementRepliesCount(commentId: Int): Boolean
+    suspend fun removeEmptyPlaceholders(parentId: Int?)
 }

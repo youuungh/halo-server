@@ -1,7 +1,6 @@
 package com.ninezero.features.coupon.domain
 
 import com.ninezero.core.common.config.CouponDiscountTarget
-import com.ninezero.core.common.config.CouponStatus
 import com.ninezero.core.common.config.CouponType
 import com.ninezero.core.common.config.SubscriptionPlanTier
 import com.ninezero.core.common.config.UserCouponStatus
@@ -106,18 +105,7 @@ class CouponRedemptionService(
             return Errors.Coupon.USER_COUPON_NOT_FOUND
         }
 
-        if (coupon.status != CouponStatus.ACTIVE) {
-            return when (coupon.status) {
-                CouponStatus.EXPIRED -> Errors.Coupon.COUPON_EXPIRED
-                CouponStatus.DISABLED -> Errors.Coupon.COUPON_DISABLED
-                else -> Errors.Coupon.COUPON_NOT_USABLE
-            }
-        }
-
-        if (now < coupon.startDate || now > coupon.endDate) {
-            return Errors.Coupon.COUPON_EXPIRED
-        }
-
+        // 쿠폰 상태·기간은 발급에만, 받은 쿠폰은 발급 때 만료일로
         if (userCoupon.status != UserCouponStatus.AVAILABLE) {
             return when (userCoupon.status) {
                 UserCouponStatus.USED -> Errors.Coupon.COUPON_ALREADY_USED

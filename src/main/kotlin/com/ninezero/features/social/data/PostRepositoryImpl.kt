@@ -343,16 +343,14 @@ class PostRepositoryImpl : PostRepository {
 
     private fun communityPostsCondition(
         creatorId: Int,
-        excludedAuthorIds: Set<Int>,
-        excludedPostIds: Set<Int>
+        excludedAuthorIds: Set<Int>
     ): Op<Boolean> = SqlExpressionBuilder.run {
         (PostTable.creatorId eq creatorId) and
                 (PostTable.contextType eq PostContextType.COMMUNITY) and
                 // 비밀글도 노출
                 (PostTable.isPinnedInCommunity eq false) and  // 고정 제외
                 (PostTable.isActive eq true) and
-                (PostTable.userId notInList excludedAuthorIds) and
-                (PostTable.id notInList excludedPostIds)
+                (PostTable.userId notInList excludedAuthorIds)
     }
 
     /** 크리에이터 커뮤니티의 포스트 목록 */
@@ -361,12 +359,11 @@ class PostRepositoryImpl : PostRepository {
         cursor: PageCursor?,
         limit: Int,
         excludedAuthorIds: Set<Int>,
-        excludedPostIds: Set<Int>,
         sort: CommunityPostSortType
     ): List<PostDao> {
         return PostDao.find {
             val afterOp = cursor?.let { afterCommunityPost(sort, it) } ?: Op.TRUE
-            communityPostsCondition(creatorId, excludedAuthorIds, excludedPostIds) and afterOp
+            communityPostsCondition(creatorId, excludedAuthorIds) and afterOp
         }.orderBy(
             when (sort) {
                 CommunityPostSortType.LATEST -> PostTable.createdAt to SortOrder.DESC

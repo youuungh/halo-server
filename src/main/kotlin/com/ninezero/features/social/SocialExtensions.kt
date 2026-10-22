@@ -124,6 +124,7 @@ fun PostDao.toAdminPostResponse(
 
 fun CommentDao.toCommentResponse(
     author: UserSummaryResponse,
+    currentUserId: Int? = null,
     isLiked: Boolean = false,
     isBookmarked: Boolean = false,
     isBlocked: Boolean = false,
@@ -133,12 +134,13 @@ fun CommentDao.toCommentResponse(
     replyPreviewUsers: List<UserPreviewResponse> = emptyList(),
     mediaItems: List<MediaItemResponse>? = null
 ): CommentResponse {
+    val isPlaceholder = isDeleted && !(isBlinded && userId == currentUserId)
     return CommentResponse(
         id = this.id.value,
         postId = postId,
         author = author,
-        content = if (isBlocked || isDeleted) "" else this.content,
-        mediaItems = if (isBlocked || isDeleted) emptyList() else (mediaItems ?: emptyList()),
+        content = if (isBlocked || isPlaceholder) "" else this.content,
+        mediaItems = if (isBlocked || isPlaceholder) emptyList() else (mediaItems ?: emptyList()),
         parentCommentId = parentCommentId,
         likeCount = likeCount,
         replyCount = replyCount,
@@ -146,7 +148,7 @@ fun CommentDao.toCommentResponse(
         isBookmarked = isBookmarked,
         isBlocked = isBlocked,
         isBlinded = isBlinded,
-        isDeleted = isDeleted,
+        isDeleted = isPlaceholder,
         firstReply = firstReply,
         hasMoreReplies = hasMoreReplies,
         moreReplyCount = moreReplyCount,

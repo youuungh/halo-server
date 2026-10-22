@@ -91,6 +91,24 @@ class BlockedUserRepositoryImpl : BlockedUserRepository {
             .toSet()
     }
 
+    /** 방향별 차단 관계 */
+    override suspend fun findBlockRelations(userId: Int): Pair<Set<Int>, Set<Int>> {
+        val blockedByMe = mutableSetOf<Int>()
+        val blockedByOther = mutableSetOf<Int>()
+        BlockedUserTable.selectAll()
+            .where {
+                (BlockedUserTable.isActive eq true) and (
+                    (BlockedUserTable.userId eq userId) or (BlockedUserTable.blockedUserId eq userId)
+                )
+            }
+            .forEach { row ->
+                val blockerId = row[BlockedUserTable.userId]
+                val blockedId = row[BlockedUserTable.blockedUserId]
+                if (blockerId == userId) blockedByMe += blockedId else blockedByOther += blockerId
+            }
+        return blockedByMe to blockedByOther
+    }
+
     /** 내 차단 목록 */
     override suspend fun findBlockedUsers(userId: Int, cursor: PageCursor?, limit: Int): List<BlockedUserDao> {
         return BlockedUserDao.find {

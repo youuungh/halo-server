@@ -441,6 +441,7 @@ object Errors {
         const val COUPON_UPDATE_PERMISSION_DENIED = "쿠폰을 수정할 권한이 없습니다."
         const val COUPON_UPDATE_FAILED = "쿠폰 수정에 실패했습니다."
         const val TOTAL_QUANTITY_BELOW_ISSUED = "이미 발급된 수량보다 적게 줄일 수 없습니다."
+        const val TERMS_LOCKED_AFTER_ISSUE = "이미 발급된 쿠폰은 사용 조건을 바꿀 수 없습니다."
         const val COUPON_DELETE_PERMISSION_DENIED = "쿠폰을 삭제할 권한이 없습니다."
         const val COUPON_DELETE_FAILED = "쿠폰 삭제에 실패했습니다."
         const val USER_COUPON_NOT_FOUND = "사용자의 쿠폰을 찾을 수 없습니다."

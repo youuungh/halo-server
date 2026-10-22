@@ -29,7 +29,6 @@ import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.communityCreatorId
 import com.ninezero.features.social.data.BookmarkRepository
 import com.ninezero.features.social.data.FollowRepository
-import com.ninezero.features.social.data.HiddenPostRepository
 import com.ninezero.features.social.data.LikeRepository
 import com.ninezero.features.social.data.PostRepository
 import com.ninezero.features.social.extractHashtags
@@ -53,7 +52,6 @@ class CommunityService(
     private val likeRepository: LikeRepository,
     private val bookmarkRepository: BookmarkRepository,
     private val followRepository: FollowRepository,
-    private val hiddenPostRepository: HiddenPostRepository,
     private val blockedUserRepository: BlockedUserRepository,
     private val postService: PostService,
     private val postMediaService: PostMediaService,
@@ -227,24 +225,18 @@ class CommunityService(
                 emptyList()
             }
 
-            val hiddenPostIds = if (currentUserId != null) {
-                hiddenPostRepository.findHiddenPostIds(currentUserId).toSet()
-            } else {
-                emptySet()
-            }
             val blockedUserIds = if (currentUserId != null) {
                 blockedUserRepository.findBlockRelatedUserIds(currentUserId)
             } else {
                 emptySet()
             }
 
-            // 차단·관심없음 글은 쿼리에서 빼 페이지 채움
+            // 차단 글은 쿼리에서 빼 페이지 채움, 관심없음은 피드에서만
             val (communityPosts, nextCursor) = postRepository.findCommunityPosts(
                 creatorId = creatorId,
                 cursor = pageCursor,
                 limit = validLimit + 1,
                 excludedAuthorIds = blockedUserIds,
-                excludedPostIds = hiddenPostIds,
                 sort = sort
             ).toCursorPage(validLimit) { post ->
                 when (sort) {

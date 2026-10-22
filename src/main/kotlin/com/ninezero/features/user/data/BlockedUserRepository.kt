@@ -18,5 +18,6 @@ interface BlockedUserRepository {
 
     // 차단 목록 조회
     suspend fun findBlockRelatedUserIds(userId: Int): Set<Int>
+    suspend fun findBlockRelations(userId: Int): Pair<Set<Int>, Set<Int>>
     suspend fun findBlockedUsers(userId: Int, cursor: PageCursor?, limit: Int): List<BlockedUserDao>
 }

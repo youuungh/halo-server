@@ -37,7 +37,12 @@ class ChatService(
                 ?: return@query null
 
             val otherUserSummary = otherUser.toUserSummaryResponse()
-            chatRoom.toChatRoomResponse(otherUserSummary, currentUserId)
+            chatRoom.toChatRoomResponse(
+                otherUserSummary,
+                currentUserId,
+                isBlockedByMe = blockedUserRepository.isBlocked(currentUserId, otherUserId),
+                isBlockedByOther = blockedUserRepository.isBlocked(otherUserId, currentUserId)
+            )
         }
     }
 
@@ -57,7 +62,7 @@ class ChatService(
             val chatRoom = chatRepository.getOrCreateChatRoom(currentUserId, otherUserId)
 
             val otherUserSummary = otherUser.toUserSummaryResponse()
-            chatRoom.toChatRoomResponse(otherUserSummary, currentUserId)
+            chatRoom.toChatRoomResponse(otherUserSummary, currentUserId, isBlockedByMe = false, isBlockedByOther = false)
         }
     }
 
@@ -84,11 +89,17 @@ class ChatService(
 
             val users = userRepository.findUsersByIds(otherUserIds)
             val usersMap = users.associateBy { it.id.value }
+            val (blockedByMe, blockedByOther) = blockedUserRepository.findBlockRelations(userId)
 
             val roomResponses = roomList.mapNotNull { room ->
                 val otherUserId = if (room.user1Id == userId) room.user2Id else room.user1Id
                 val otherUser = usersMap[otherUserId]?.toUserSummaryResponse() ?: return@mapNotNull null  // 상대 없으면 목록에서 제외
-                room.toChatRoomResponse(otherUser, userId)
+                room.toChatRoomResponse(
+                    otherUser,
+                    userId,
+                    isBlockedByMe = otherUserId in blockedByMe,
+                    isBlockedByOther = otherUserId in blockedByOther
+                )
             }
 
             val pagination = PaginationInfo(validPage, validLimit, totalCount)
@@ -105,7 +116,12 @@ class ChatService(
                 ?: throw NotFoundException(Errors.User.USER_NOT_FOUND)
 
             val otherUserSummary = otherUser.toUserSummaryResponse()
-            chatRoom.toChatRoomResponse(otherUserSummary, currentUserId)
+            chatRoom.toChatRoomResponse(
+                otherUserSummary,
+                currentUserId,
+                isBlockedByMe = blockedUserRepository.isBlocked(currentUserId, otherUserId),
+                isBlockedByOther = blockedUserRepository.isBlocked(otherUserId, currentUserId)
+            )
         }
     }
 

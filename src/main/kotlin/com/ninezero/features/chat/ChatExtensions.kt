@@ -19,7 +19,9 @@ import kotlinx.serialization.json.Json
 
 fun ChatRoomDao.toChatRoomResponse(
     otherUser: UserSummaryResponse,
-    currentUserId: Int
+    currentUserId: Int,
+    isBlockedByMe: Boolean,
+    isBlockedByOther: Boolean
 ): ChatRoomResponse {
     val unreadCount = when (currentUserId) {
         user1Id -> user1UnreadCount
@@ -48,6 +50,8 @@ fun ChatRoomDao.toChatRoomResponse(
         lastMessage = lastMessage,
         unreadCount = unreadCount,
         isArchived = isArchived,
+        isBlockedByMe = isBlockedByMe,
+        isBlockedByOther = isBlockedByOther,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

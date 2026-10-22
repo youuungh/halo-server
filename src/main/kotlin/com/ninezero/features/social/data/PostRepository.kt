@@ -91,7 +91,6 @@ interface PostRepository {
         cursor: PageCursor?,
         limit: Int,
         excludedAuthorIds: Set<Int>,
-        excludedPostIds: Set<Int>,
         sort: CommunityPostSortType
     ): List<PostDao>
 

@@ -57,9 +57,9 @@ class CommentRepositoryImpl : CommentRepository {
         }.firstOrNull()
     }
 
-    /** 삭제 자리까지 포함한 댓글 조회 */
-    override suspend fun findThreadCommentById(commentId: Int): CommentDao? {
-        return CommentDao.find { (CommentTable.id eq commentId) and shownInThread() }.firstOrNull()
+    /** 삭제·블라인드 자리와 본인 블라인드까지 포함한 댓글 조회 */
+    override suspend fun findThreadCommentById(commentId: Int, viewerId: Int?): CommentDao? {
+        return CommentDao.find { (CommentTable.id eq commentId) and visibleInThread(viewerId) }.firstOrNull()
     }
 
     /** 스레드에 남은 답글(삭제 자리 포함) 여부 */
@@ -77,7 +77,7 @@ class CommentRepositoryImpl : CommentRepository {
     ): List<CommentDao> {
         return CommentDao.find {
             (CommentTable.postId eq postId) and
-                    visibleInThread(viewerId) and  // 활성 + 본인 블라인드 + 삭제 자리
+                    visibleInThread(viewerId) and  // 활성 + 본인 블라인드 + 삭제·블라인드 자리
                     (CommentTable.parentCommentId.isNull())
         }
             .orderBy(
@@ -230,6 +230,17 @@ class CommentRepositoryImpl : CommentRepository {
         }
         return updated > 0
     }
+
+    /** 답글이 모두 사라진 자리를 위로 따라가며 정리 */
+    override suspend fun removeEmptyPlaceholders(parentId: Int?) {
+        var current = parentId?.let { CommentDao.findById(it) }
+        while (current != null && current.isDeleted && !hasThreadReplies(current.id.value)) {
+            current.isDeleted = false
+            val grandParentId = current.parentCommentId
+            grandParentId?.let { decrementRepliesCount(it) }  // 그 부모 아래 자리 하나가 사라짐
+            current = grandParentId?.let { CommentDao.findById(it) }
+        }
+    }
 }
 
 private fun SqlExpressionBuilder.visibleToViewer(viewerId: Int?): Op<Boolean> =
@@ -240,10 +251,10 @@ private fun SqlExpressionBuilder.visibleToViewer(viewerId: Int?): Op<Boolean> =
             ((CommentTable.isBlinded eq true) and (CommentTable.userId eq viewerId))
     }
 
-/** 활성 댓글과 삭제 자리 */
+/** 활성 댓글과 삭제·블라인드 자리 */
 private fun SqlExpressionBuilder.shownInThread(): Op<Boolean> =
     (CommentTable.isActive eq true) or (CommentTable.isDeleted eq true)
 
-/** 댓글·답글 목록용, 삭제 자리 포함 */
+/** 댓글·답글 목록용, 삭제·블라인드 자리 포함 */
 private fun SqlExpressionBuilder.visibleInThread(viewerId: Int?): Op<Boolean> =
     visibleToViewer(viewerId) or (CommentTable.isDeleted eq true)

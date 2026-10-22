@@ -185,9 +185,7 @@ class ReportService(
                 ReportTargetType.COMMENT -> {
                     val comment = CommentDao.findById(targetId)?.takeIf { it.isActive || it.isBlinded }
                         ?: throw NotFoundException(Errors.Social.Comment.COMMENT_NOT_FOUND)
-                    if (comment.isActive) adjustCommentCounts(comment, visible = false)
-                    comment.isActive = false
-                    comment.isBlinded = true
+                    if (comment.isActive) blindComment(comment)
                 }
 
                 ReportTargetType.USER -> throw InvalidInputException(Errors.Social.Report.USER_CANNOT_BE_BLINDED)  // USER는 블라인드 불가
@@ -214,10 +212,8 @@ class ReportService(
                     val comment = CommentDao.findById(targetId)
                         ?: throw NotFoundException(Errors.Social.Comment.COMMENT_NOT_FOUND)
                     if (!comment.isBlinded) throw InvalidInputException(Errors.Social.Report.NOT_BLINDED)
-                    comment.isActive = true
-                    comment.isBlinded = false
+                    unblindComment(comment)
                     comment.moderationLocked = true  // 재블라인드 차단 마커
-                    adjustCommentCounts(comment, visible = true)
                 }
 
                 ReportTargetType.USER -> throw InvalidInputException(Errors.Social.Report.USER_CANNOT_BE_BLINDED)
@@ -245,9 +241,7 @@ class ReportService(
             ReportTargetType.COMMENT -> {
                 val comment = CommentDao.findById(targetId) ?: return false
                 if (comment.moderationLocked || comment.isBlinded || !comment.isActive) return false
-                adjustCommentCounts(comment, visible = false)
-                comment.isActive = false
-                comment.isBlinded = true
+                blindComment(comment)
                 true
             }
 
@@ -255,16 +249,32 @@ class ReportService(
         }
     }
 
-    /** 블라인드 댓글은 포스트 댓글 수·부모 답글 수에서 제외 */
-    private suspend fun adjustCommentCounts(comment: CommentDao, visible: Boolean) {
+    /** 활성 댓글 블라인드 */
+    private suspend fun blindComment(comment: CommentDao) {
         val parentId = comment.parentCommentId
-        if (visible) {
-            postRepository.incrementCommentCount(comment.postId)
-            parentId?.let { commentRepository.incrementRepliesCount(it) }
-        } else {
-            postRepository.decrementCommentCount(comment.postId)
-            parentId?.let { commentRepository.decrementRepliesCount(it) }
+        val keepsPlaceholder = commentRepository.hasThreadReplies(comment.id.value)
+        comment.isActive = false
+        comment.isBlinded = true
+        comment.isDeleted = keepsPlaceholder
+
+        // 포스트 댓글 수는 바로, 부모 답글 수는 자리가 사라질 때만
+        postRepository.decrementCommentCount(comment.postId)
+        if (parentId != null && !keepsPlaceholder) {
+            commentRepository.decrementRepliesCount(parentId)
+            commentRepository.removeEmptyPlaceholders(parentId)
         }
+    }
+
+    /** 블라인드 해제 */
+    private suspend fun unblindComment(comment: CommentDao) {
+        val parentId = comment.parentCommentId
+        val wasPlaceholder = comment.isDeleted
+        comment.isActive = true
+        comment.isBlinded = false
+        comment.isDeleted = false
+
+        postRepository.incrementCommentCount(comment.postId)
+        if (parentId != null && !wasPlaceholder) commentRepository.incrementRepliesCount(parentId)
     }
 
     /** 블라인드 대상의 소속 포스트 */

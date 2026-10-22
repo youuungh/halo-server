@@ -213,7 +213,7 @@ class CommentService(
     /** 댓글 조상 체인 조회 */
     suspend fun getCommentThread(commentId: Int, currentUserId: Int? = null): List<CommentResponse> {
         return query {
-            val target = commentRepository.findThreadCommentById(commentId)  // 딥링크 직접 진입용
+            val target = commentRepository.findThreadCommentById(commentId, currentUserId)  // 딥링크 직접 진입용
                 ?: throw CommentNotFoundException(Errors.Social.Comment.COMMENT_NOT_FOUND)
 
             if (postService.isSecretPostHiddenFrom(target.postId, currentUserId)) {
@@ -226,7 +226,7 @@ class CommentService(
             var depth = 0
             while (current != null && depth < COMMENT_THREAD_MAX_DEPTH) {
                 chain.add(0, current)
-                current = current.parentCommentId?.let { commentRepository.findThreadCommentById(it) }
+                current = current.parentCommentId?.let { commentRepository.findThreadCommentById(it, currentUserId) }
                 depth++
             }
 
@@ -253,6 +253,7 @@ class CommentService(
                     ?: throw UserNotFoundException(Errors.User.USER_NOT_FOUND)
                 comment.toCommentResponse(
                     author = author,
+                    currentUserId = currentUserId,
                     isLiked = likeStatusMap[comment.id.value] ?: false,
                     isBookmarked = bookmarkStatusMap[comment.id.value] ?: false,
                     isBlocked = comment.userId in blockedUserIds,
@@ -296,7 +297,7 @@ class CommentService(
 
         return query {
             // 비밀글 댓글의 대댓글도 비참여자에게 빈 목록
-            val parentComment = commentRepository.findThreadCommentById(commentId)
+            val parentComment = commentRepository.findThreadCommentById(commentId, currentUserId)
             if (parentComment != null && postService.isSecretPostHiddenFrom(parentComment.postId, currentUserId)) {
                 return@query createPagedResponse(emptyList(), PaginationInfo(validPage, validLimit, 0))
             }
@@ -362,6 +363,7 @@ class CommentService(
             val firstReply = replies.firstOrNull()?.let { reply ->
                 reply.toCommentResponse(
                     author = authorOf(reply),
+                    currentUserId = currentUserId,
                     isLiked = likeStatusMap[reply.id.value] ?: false,
                     isBookmarked = bookmarkStatusMap[reply.id.value] ?: false,
                     isBlocked = reply.userId in blockedUserIds,
@@ -378,6 +380,7 @@ class CommentService(
 
             comment.toCommentResponse(
                 author = authorOf(comment),
+                currentUserId = currentUserId,
                 isLiked = likeStatusMap[comment.id.value] ?: false,
                 isBookmarked = bookmarkStatusMap[comment.id.value] ?: false,
                 isBlocked = comment.userId in blockedUserIds,
@@ -434,6 +437,7 @@ class CommentService(
             val postId = comment.postId
             val parentId = comment.parentCommentId
             val wasActive = comment.isActive  // 블라인드 댓글은 블라인드 때 개수에서 이미 뺌
+            val wasInThread = wasActive || comment.isDeleted  // 블라인드 자리는 부모 답글 수에 남아 있음
             val keepsPlaceholder = commentRepository.hasThreadReplies(commentId)
 
             comment.isActive = false
@@ -444,14 +448,14 @@ class CommentService(
             if (wasActive) {
                 postRepository.decrementCommentCount(postId)
             }
-            if (parentId != null && wasActive && !keepsPlaceholder) {
+            if (parentId != null && wasInThread && !keepsPlaceholder) {
                 commentRepository.decrementRepliesCount(parentId)
             }
-            if (parentId != null && !wasActive && keepsPlaceholder) {
+            if (parentId != null && !wasInThread && keepsPlaceholder) {
                 commentRepository.incrementRepliesCount(parentId)
             }
             if (!keepsPlaceholder) {
-                removeEmptyPlaceholders(parentId)
+                commentRepository.removeEmptyPlaceholders(parentId)
             }
 
             // 원본 + 썸네일 수거
@@ -583,7 +587,8 @@ class CommentService(
                     val parentAuthor = userMap[parent.userId]?.toUserSummaryResponse(isFollowing = followStatusMap[parent.userId])
                         ?: return@mapNotNull null
                     val isParentBlocked = parent.userId in blockedUserIds
-                    val isParentDeleted = !parent.isActive
+                    val isParentOwnBlinded = parent.isBlinded && parent.userId == currentUserId
+                    val isParentDeleted = !parent.isActive && !isParentOwnBlinded
 
                     threadCommentsList.add(
                         ThreadCommentResponse(
@@ -603,7 +608,8 @@ class CommentService(
                             isBookmarked = commentBookmarkStatusMap[parent.id.value] ?: false,
                             isProfileUser = parent.userId == userId,
                             isBlocked = isParentBlocked,
-                            isDeleted = isParentDeleted
+                            isDeleted = isParentDeleted,
+                            isBlinded = parent.isBlinded
                         )
                     )
                 }
@@ -793,17 +799,6 @@ class CommentService(
             durationMs = null,
             thumbnailUrl = display?.let { runCatching { fileUploadService.uploadCommentThumbnail(commentId, it) }.getOrNull() }
         )
-    }
-
-    /** 답글이 모두 사라진 삭제 자리를 위로 따라가며 정리 */
-    private suspend fun removeEmptyPlaceholders(parentId: Int?) {
-        var current = parentId?.let { CommentDao.findById(it) }
-        while (current != null && current.isDeleted && !commentRepository.hasThreadReplies(current.id.value)) {
-            current.isDeleted = false
-            val grandParentId = current.parentCommentId
-            grandParentId?.let { commentRepository.decrementRepliesCount(it) }  // 그 부모 아래 자리 하나가 사라짐
-            current = grandParentId?.let { CommentDao.findById(it) }
-        }
     }
 
     private suspend fun verifyCommentOwnership(

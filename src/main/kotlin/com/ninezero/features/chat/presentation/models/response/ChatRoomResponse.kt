@@ -12,6 +12,8 @@ data class ChatRoomResponse(
     val lastMessage: LastMessageInfo? = null,
     val unreadCount: Int,
     val isArchived: Boolean,
+    val isBlockedByMe: Boolean,
+    val isBlockedByOther: Boolean,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
 )
