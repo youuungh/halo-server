@@ -64,8 +64,13 @@ fun createMessagePreview(
 
 // 날짜·시간
 
+object AppClock {
+    @Volatile
+    var clock: Clock = Clock.System
+}
+
 fun nowUtc(): LocalDateTime {
-    return Clock.System.now().toLocalDateTime(TimeZone.UTC)
+    return AppClock.clock.now().toLocalDateTime(TimeZone.UTC)
 }
 
 /** 달·날짜 경계 기준 업무 시간대 */

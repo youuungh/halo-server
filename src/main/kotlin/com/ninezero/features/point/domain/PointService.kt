@@ -24,7 +24,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import java.math.BigDecimal
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 class PointService(
@@ -112,7 +111,7 @@ class PointService(
 
         val balanceBefore = point.balance
         val balanceAfter = balanceBefore.add(amount)
-        val expiresAt = Clock.System.now()
+        val expiresAt = AppClock.clock.now()
             .plus(Constants.Point.EXPIRATION_DAYS.days)
             .toLocalDateTime(TimeZone.UTC)
 

@@ -1,5 +1,6 @@
 package com.ninezero.plugins
 
+import com.ninezero.core.common.config.DotenvConfig
 import com.ninezero.core.common.util.BUSINESS_TIMEZONE
 import com.ninezero.features.commerce.domain.OrderService
 import com.ninezero.features.commerce.domain.OrderShippingService
@@ -30,6 +31,11 @@ private const val STALE_DEVICE_TOKEN_DAYS = 30
 private const val EXPIRED_PENDING_SIGNUP_RETENTION_DAYS = 1  // 시간당 발송 상한 창보다 길게
 
 fun Application.configureScheduler() {
+    if (!DotenvConfig.getOrDefault("SCHEDULER_ENABLED", "true").toBoolean()) {  // 점검·데이터 이관 중엔 끔
+        log.info("스케줄러가 꺼져 있습니다.")
+        return
+    }
+
     val pointService by inject<PointService>()
     val couponRedemptionService by inject<CouponRedemptionService>()
     val orderService by inject<OrderService>()

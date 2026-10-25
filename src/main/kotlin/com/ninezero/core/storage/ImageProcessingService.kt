@@ -9,7 +9,8 @@ import java.io.File
 import javax.imageio.ImageIO
 
 private const val MAX_IMAGE_PIXELS = 50_000_000L
-private const val PRODUCT_IMAGE_MAX_DIMENSION = 1440
+private const val PRODUCT_IMAGE_MAX_WIDTH = 1440
+private const val PRODUCT_IMAGE_MAX_HEIGHT = 16000  // WebP 한 변 상한 안, 긴 상세 이미지용
 
 private const val WEBP_QUALITY = 80
 
@@ -69,6 +70,9 @@ class ImageProcessingService {
     }
 
     suspend fun generateDisplayImage(file: ByteArray, maxDimension: Int = 1080): ByteArray? =
+        resizeToWebp(file, maxWidth = maxDimension, maxHeight = maxDimension)
+
+    private suspend fun resizeToWebp(file: ByteArray, maxWidth: Int, maxHeight: Int): ByteArray? =
         withContext(dispatcher) {
             // GIF는 애니메이션 보존 위해 변형 안 함
             if (isGif(file)) return@withContext null
@@ -79,8 +83,7 @@ class ImageProcessingService {
                 val height = original.height
                 if (width <= 0 || height <= 0) return@withContext null
 
-                val longest = maxOf(width, height)
-                val scale = if (longest > maxDimension) maxDimension.toFloat() / longest else 1f
+                val scale = minOf(1f, maxWidth.toFloat() / width, maxHeight.toFloat() / height)
                 val targetWidth = (width * scale).toInt().coerceAtLeast(1)
                 val targetHeight = (height * scale).toInt().coerceAtLeast(1)
 
@@ -194,9 +197,9 @@ class ImageProcessingService {
         }
     }
 
-    /** 실패 시 원본으로 두는 1440px WebP 상품 이미지 */
+    /** 실패 시 원본으로 두는 가로 1440px WebP 상품 이미지 */
     suspend fun generateProductImage(file: ByteArray): ByteArray =
-        generateDisplayImage(file, maxDimension = PRODUCT_IMAGE_MAX_DIMENSION)
+        resizeToWebp(file, maxWidth = PRODUCT_IMAGE_MAX_WIDTH, maxHeight = PRODUCT_IMAGE_MAX_HEIGHT)
             ?: convertToWebp(file)
             ?: file
 
