@@ -3,11 +3,15 @@ package com.ninezero.features.banner.domain
 import com.ninezero.core.common.config.BannerType
 import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.exception.InternalServerException
+import com.ninezero.core.common.util.AppClock
+import com.ninezero.core.common.util.BUSINESS_TIMEZONE
 import com.ninezero.core.common.util.logger
 import com.ninezero.features.banner.presentation.models.response.BannerListResponse
 import com.ninezero.features.banner.presentation.models.response.BannerResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -26,8 +30,14 @@ internal data class BannerItem(
     val link: String,
     val type: BannerType,
     val order: Int,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val showFrom: LocalDate? = null,  // 업무 시간대 날짜, 없으면 제한 없음
+    val showUntil: LocalDate? = null
 )
+
+internal fun List<BannerItem>.visibleOn(today: LocalDate): List<BannerItem> = filter {
+    it.isActive && (it.showFrom == null || today >= it.showFrom) && (it.showUntil == null || today <= it.showUntil)
+}
 
 class BannerService {
     private val logger = logger()
@@ -39,8 +49,9 @@ class BannerService {
     private var lastLoadTime: Long = 0L
 
     suspend fun getActiveBanners(limit: Int? = null): BannerListResponse {
+        val today = AppClock.clock.now().toLocalDateTime(BUSINESS_TIMEZONE).date
         val banners = loadBanners().banners
-            .filter { it.isActive }
+            .visibleOn(today)
             .sortedBy { it.order }
             .let { if (limit != null) it.take(limit) else it }
             .map { it.toBannerResponse() }

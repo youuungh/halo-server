@@ -17,7 +17,9 @@
       "link": "https://example.com/event",
       "type": "EVENT",
       "order": 2,
-      "isActive": true
+      "isActive": true,
+      "showFrom": "2026-11-01",
+      "showUntil": "2026-11-15"
     }
   ]
 }
