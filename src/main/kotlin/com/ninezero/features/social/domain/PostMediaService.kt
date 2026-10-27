@@ -118,7 +118,7 @@ class PostMediaService(
             }
 
             val uploads = verifyVideoUploads(sources, userId, postId)
-            prepared = prepareNewMedia(postId, sources, files, uploads)
+            prepared = prepareNewMedia(userId, sources, files, uploads)
 
             val (response, communityCreatorId) = query {
                 val post = requireOwnedPost(postRepository, 
@@ -187,7 +187,7 @@ class PostMediaService(
 
     /** 새 미디어 순서대로 업로드·가공 */
     private suspend fun prepareNewMedia(
-        postId: Int,
+        userId: Int,
         sources: List<NewMediaSource>,
         files: List<ByteArray>,
         uploads: Map<Int, MediaUploadService.VerifiedUpload>
@@ -196,8 +196,8 @@ class PostMediaService(
         try {
             sources.forEach { source ->
                 prepared += when (source) {
-                    is NewMediaSource.FilePart -> prepareImage(postId, files[source.index])
-                    is NewMediaSource.DirectUpload -> prepareVideo(postId, uploads.getValue(source.uploadId))
+                    is NewMediaSource.FilePart -> prepareImage(userId, files[source.index])
+                    is NewMediaSource.DirectUpload -> prepareVideo(userId, uploads.getValue(source.uploadId))
                 }
             }
         } catch (e: Exception) {
@@ -207,24 +207,24 @@ class PostMediaService(
         return prepared
     }
 
-    private suspend fun prepareImage(postId: Int, bytes: ByteArray): PreparedMedia {
+    private suspend fun prepareImage(userId: Int, bytes: ByteArray): PreparedMedia {
         // 원본 업로드 뒤 실패 방지로 파생물 먼저 생성
         val dimensions = imageProcessingService.extractImageDimensions(bytes)
         val display = imageProcessingService.generateDisplayImage(bytes)
         val preview = imageProcessingService.generateLockedPreview(bytes)
-        val url = fileUploadService.uploadPostMedia(postId, bytes, imageProcessingService.imageExtensionForBytes(bytes))
+        val url = fileUploadService.uploadPostMedia(userId, bytes, imageProcessingService.imageExtensionForBytes(bytes))
         return PreparedMedia(
             type = MediaType.IMAGE,
             url = url,
             width = dimensions?.first,
             height = dimensions?.second,
             durationMs = null,
-            thumbnailUrl = display?.let { runCatching { fileUploadService.uploadPostThumbnail(postId, it) }.getOrNull() },
-            previewUrl = preview?.let { runCatching { fileUploadService.uploadPostPreview(postId, it) }.getOrNull() }
+            thumbnailUrl = display?.let { runCatching { fileUploadService.uploadPostThumbnail(userId, it) }.getOrNull() },
+            previewUrl = preview?.let { runCatching { fileUploadService.uploadPostPreview(userId, it) }.getOrNull() }
         )
     }
 
-    private suspend fun prepareVideo(postId: Int, upload: MediaUploadService.VerifiedUpload): PreparedMedia {
+    private suspend fun prepareVideo(userId: Int, upload: MediaUploadService.VerifiedUpload): PreparedMedia {
         val video = prepareUploadedVideo(videoProcessingService, fileUploadService, upload)
         val preview = video.thumbnail?.let { imageProcessingService.generateLockedPreview(it) }
         return PreparedMedia(
@@ -233,8 +233,8 @@ class PostMediaService(
             width = video.meta.width,
             height = video.meta.height,
             durationMs = video.meta.durationMs,
-            thumbnailUrl = video.thumbnail?.let { runCatching { fileUploadService.uploadPostThumbnail(postId, it) }.getOrNull() },
-            previewUrl = preview?.let { runCatching { fileUploadService.uploadPostPreview(postId, it) }.getOrNull() },
+            thumbnailUrl = video.thumbnail?.let { runCatching { fileUploadService.uploadPostThumbnail(userId, it) }.getOrNull() },
+            previewUrl = preview?.let { runCatching { fileUploadService.uploadPostPreview(userId, it) }.getOrNull() },
             uploadId = upload.uploadId
         )
     }

@@ -151,7 +151,7 @@ object TestFixtures {
         userId: Int,
         targetType: MediaDraftTargetType = MediaDraftTargetType.POST,
         type: MediaType = MediaType.IMAGE,
-        url: String = "https://test.supabase.co/storage/v1/object/public/posts/drafts/$userId/draft_${System.nanoTime()}.jpg"
+        url: String = "https://test.supabase.co/storage/v1/object/public/posts/users/$userId/media_${System.nanoTime()}.jpg"
     ): MediaDraftDao {
         return query {
             MediaDraftDao.new {

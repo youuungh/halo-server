@@ -18,12 +18,10 @@ object StoragePaths {
     fun uploadPath(purpose: UploadPurpose, targetId: Int?, userId: Int, extension: String): String = when (purpose) {
         UploadPurpose.CHAT_VIDEO -> "chats/$targetId/videos/${fileName("chat_video", userId, extension)}"
         UploadPurpose.CHAT_FILE -> "chats/$targetId/files/${fileName("chat_file", userId, extension)}"
-        UploadPurpose.POST_VIDEO -> "posts/$targetId/${fileName("post", userId, extension)}"
-        UploadPurpose.DRAFT_POST_VIDEO, UploadPurpose.DRAFT_COMMENT_VIDEO -> draftPath(userId, extension)
+        UploadPurpose.POST_VIDEO, UploadPurpose.DRAFT_POST_VIDEO, UploadPurpose.DRAFT_COMMENT_VIDEO -> mediaPath(userId, extension)
     }
 
-    /** 초안 파일은 대상 없이 소유자 폴더 */
-    fun draftPath(userId: Int, extension: String): String = "drafts/$userId/${fileName("draft", userId, extension)}"
+    fun mediaPath(userId: Int, extension: String): String = "users/$userId/${fileName("media", userId, extension)}"
 
     /** 우리 공개 URL의 bucket 내부 경로 */
     fun pathOf(url: String, bucket: String): String? {

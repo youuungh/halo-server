@@ -146,7 +146,7 @@ class FileUploadService(
     // 상품·리뷰
 
     suspend fun uploadProductImage(
-        productId: Int,
+        userId: Int,
         file: ByteArray
     ): String {
         if (file.size > StorageConfig.FileSizeLimit.PRODUCT) {
@@ -154,8 +154,7 @@ class FileUploadService(
         }
 
         val processed = imageProcessingService.generateProductImage(file)
-        val fileName = StoragePaths.fileName("product", productId, imageProcessingService.imageExtensionForBytes(processed))
-        val path = "products/$productId/$fileName"
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(processed))
 
         storage.from(StorageConfig.Buckets.PRODUCTS).upload(path, processed)
 
@@ -195,7 +194,7 @@ class FileUploadService(
     // 포스트·댓글
 
     suspend fun uploadPostMedia(
-        postId: Int,
+        userId: Int,
         file: ByteArray,
         extension: String
     ): String {
@@ -203,31 +202,27 @@ class FileUploadService(
             throw IllegalArgumentException("포스트 미디어는 ${StorageConfig.FileSizeLimit.POST / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
-        val fileName = StoragePaths.fileName("post", postId, extension)
-        val path = "posts/$postId/$fileName"
+        val path = StoragePaths.mediaPath(userId, extension)
 
         storage.from(StorageConfig.Buckets.POSTS).upload(path, file)
 
         return StoragePaths.publicUrl(StorageConfig.Buckets.POSTS, path)
     }
 
-    suspend fun uploadPostThumbnail(postId: Int, thumbnail: ByteArray): String {
-        val fileName = StoragePaths.fileName("post_thumb", postId, imageProcessingService.imageExtensionForBytes(thumbnail))
-        val path = "posts/$postId/$fileName"
+    suspend fun uploadPostThumbnail(userId: Int, thumbnail: ByteArray): String {
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(thumbnail))
         storage.from(StorageConfig.Buckets.POSTS).upload(path, thumbnail)
         return StoragePaths.publicUrl(StorageConfig.Buckets.POSTS, path)
     }
 
-    /** 잠금 블러 프리뷰 업로드 */
-    suspend fun uploadPostPreview(postId: Int, preview: ByteArray): String {
-        val fileName = StoragePaths.fileName("post_preview", postId, imageProcessingService.imageExtensionForBytes(preview))
-        val path = "posts/$postId/$fileName"
+    suspend fun uploadPostPreview(userId: Int, preview: ByteArray): String {
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(preview))
         storage.from(StorageConfig.Buckets.POSTS).upload(path, preview)
         return StoragePaths.publicUrl(StorageConfig.Buckets.POSTS, path)  // 비권한자엔 원본 대신 이 URL만 노출
     }
 
     suspend fun uploadCommentMedia(
-        commentId: Int,
+        userId: Int,
         file: ByteArray,
         extension: String
     ): String {
@@ -235,17 +230,15 @@ class FileUploadService(
             throw IllegalArgumentException("댓글 미디어는 ${StorageConfig.FileSizeLimit.COMMENT / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
-        val fileName = StoragePaths.fileName("comment", commentId, extension)
-        val path = "comments/$commentId/$fileName"
+        val path = StoragePaths.mediaPath(userId, extension)
 
         storage.from(StorageConfig.Buckets.COMMENTS).upload(path, file)
 
         return StoragePaths.publicUrl(StorageConfig.Buckets.COMMENTS, path)
     }
 
-    suspend fun uploadCommentThumbnail(commentId: Int, thumbnail: ByteArray): String {
-        val fileName = StoragePaths.fileName("comment_thumb", commentId, imageProcessingService.imageExtensionForBytes(thumbnail))
-        val path = "comments/$commentId/$fileName"
+    suspend fun uploadCommentThumbnail(userId: Int, thumbnail: ByteArray): String {
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(thumbnail))
         storage.from(StorageConfig.Buckets.COMMENTS).upload(path, thumbnail)
         return StoragePaths.publicUrl(StorageConfig.Buckets.COMMENTS, path)
     }
@@ -254,20 +247,20 @@ class FileUploadService(
 
     /** 글·댓글에 붙기 전 초안 미디어 업로드 */
     suspend fun uploadDraftMedia(bucket: String, userId: Int, file: ByteArray, extension: String): String {
-        val path = StoragePaths.draftPath(userId, extension)
+        val path = StoragePaths.mediaPath(userId, extension)
         storage.from(bucket).upload(path, file)
         return StoragePaths.publicUrl(bucket, path)
     }
 
     suspend fun uploadDraftThumbnail(bucket: String, userId: Int, thumbnail: ByteArray): String {
-        val path = StoragePaths.draftPath(userId, imageProcessingService.imageExtensionForBytes(thumbnail))
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(thumbnail))
         storage.from(bucket).upload(path, thumbnail)
         return StoragePaths.publicUrl(bucket, path)
     }
 
     /** 잠금 블러 프리뷰 업로드 */
     suspend fun uploadDraftPreview(bucket: String, userId: Int, preview: ByteArray): String {
-        val path = StoragePaths.draftPath(userId, imageProcessingService.imageExtensionForBytes(preview))
+        val path = StoragePaths.mediaPath(userId, imageProcessingService.imageExtensionForBytes(preview))
         storage.from(bucket).upload(path, preview)
         return StoragePaths.publicUrl(bucket, path)
     }

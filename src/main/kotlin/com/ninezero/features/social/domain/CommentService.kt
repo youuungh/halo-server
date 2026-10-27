@@ -730,7 +730,7 @@ class CommentService(
                 )
             }
 
-            prepared = prepareNewMedia(commentId, files)
+            prepared = prepareNewMedia(userId, files)
 
             val response = query {
                 verifyCommentOwnership(
@@ -775,10 +775,10 @@ class CommentService(
     }
 
     /** 새 사진 순서대로 업로드·가공 */
-    private suspend fun prepareNewMedia(commentId: Int, files: List<ByteArray>): List<PreparedMedia> {
+    private suspend fun prepareNewMedia(userId: Int, files: List<ByteArray>): List<PreparedMedia> {
         val prepared = mutableListOf<PreparedMedia>()
         try {
-            files.forEach { prepared += prepareImage(commentId, it) }
+            files.forEach { prepared += prepareImage(userId, it) }
         } catch (e: Exception) {
             discardPreparedMedia(fileUploadService, prepared)
             throw e
@@ -786,18 +786,18 @@ class CommentService(
         return prepared
     }
 
-    private suspend fun prepareImage(commentId: Int, bytes: ByteArray): PreparedMedia {
+    private suspend fun prepareImage(userId: Int, bytes: ByteArray): PreparedMedia {
         // 원본 업로드 뒤 실패 방지로 파생물 먼저 생성
         val dimensions = imageProcessingService.extractImageDimensions(bytes)
         val display = imageProcessingService.generateDisplayImage(bytes)
-        val url = fileUploadService.uploadCommentMedia(commentId, bytes, imageProcessingService.imageExtensionForBytes(bytes))
+        val url = fileUploadService.uploadCommentMedia(userId, bytes, imageProcessingService.imageExtensionForBytes(bytes))
         return PreparedMedia(
             type = MediaType.IMAGE,
             url = url,
             width = dimensions?.first,
             height = dimensions?.second,
             durationMs = null,
-            thumbnailUrl = display?.let { runCatching { fileUploadService.uploadCommentThumbnail(commentId, it) }.getOrNull() }
+            thumbnailUrl = display?.let { runCatching { fileUploadService.uploadCommentThumbnail(userId, it) }.getOrNull() }
         )
     }
 

@@ -130,7 +130,7 @@ class MediaDraftServiceTest {
     }
 
     private fun draftUrl(bucket: String, userId: Int, name: String) =
-        StoragePaths.publicUrl(bucket, "drafts/$userId/$name.jpg")
+        StoragePaths.publicUrl(bucket, "users/$userId/$name.jpg")
 
     private suspend fun createImageDrafts(userId: Int, targetType: MediaDraftTargetType = MediaDraftTargetType.POST, count: Int = 1) =
         mediaDraftService.createImageDrafts(
@@ -163,11 +163,11 @@ class MediaDraftServiceTest {
             postDrafts.forEach { draft ->
                 assertEquals(MediaType.IMAGE, draft.type)
                 assertEquals(100, draft.width)
-                assertTrue(draft.url.contains("/posts/drafts/${user.id.value}/"))
+                assertTrue(draft.url.contains("/posts/users/${user.id.value}/"))
                 assertNotNull(draft.thumbnailUrl)
                 assertNotNull(draft.previewUrl)
             }
-            assertTrue(commentDraft.url.contains("/comments/drafts/${user.id.value}/"))
+            assertTrue(commentDraft.url.contains("/comments/users/${user.id.value}/"))
             assertNotNull(commentDraft.thumbnailUrl)
             assertNull(commentDraft.previewUrl)
 
@@ -233,7 +233,7 @@ class MediaDraftServiceTest {
             val draft = createImageDrafts(user.id.value, MediaDraftTargetType.PRODUCT).single()
 
             assertEquals(MediaType.IMAGE, draft.type)
-            assertTrue(draft.url.contains("/products/drafts/${user.id.value}/draft_2"))  // 가공본 크기
+            assertTrue(draft.url.contains("/products/users/${user.id.value}/draft_2"))  // 가공본 크기
             assertNull(draft.thumbnailUrl)
             assertNull(draft.previewUrl)
             coVerify(exactly = 0) { imageProcessingService.generateDisplayImage(any(), any()) }
@@ -268,7 +268,7 @@ class MediaDraftServiceTest {
             assertEquals(UploadPurpose.DRAFT_COMMENT_VIDEO, record.purpose)
             assertNull(record.targetId)
             assertEquals(StorageConfig.Buckets.COMMENTS, record.bucket)
-            assertTrue(record.path.startsWith("drafts/${user.id.value}/draft_${user.id.value}_"))
+            assertTrue(record.path.startsWith("users/${user.id.value}/media_${user.id.value}_"))
             assertTrue(record.path.endsWith(".mp4"))
         }
     }
@@ -284,7 +284,7 @@ class MediaDraftServiceTest {
             assertEquals(MediaDraftStatus.PROCESSING, draft.status)
             assertEquals(MediaType.VIDEO, draft.type)
             assertNull(draft.width)
-            assertTrue(draft.url.contains("/posts/drafts/${user.id.value}/draft_"))
+            assertTrue(draft.url.contains("/posts/users/${user.id.value}/media_"))
             assertEquals(UploadStatus.CONSUMED, query { MediaUploadDao.findById(upload.uploadId) }!!.status)
 
             awaitProcessing()

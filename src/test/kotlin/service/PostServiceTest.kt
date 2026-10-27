@@ -882,7 +882,7 @@ class PostServiceTest {
             coVerify {
                 fileUploadService.deleteByUrls(
                     match { urls ->
-                        imageUrl(post.id.value, 1) in urls && urls.none { it.contains("/post_${user.id.value}_") }
+                        imageUrl(user.id.value, 1) in urls && urls.none { it.contains("/media_${user.id.value}_") }
                     }
                 )
             }
@@ -956,7 +956,7 @@ class PostServiceTest {
             // Then
             assertEquals(existing.id, response.mediaItems.first().id)
             assertEquals(listOf(MediaType.IMAGE, MediaType.VIDEO, MediaType.IMAGE), response.mediaItems.map { it.type })
-            assertEquals(imageUrl(post.id.value, 2), response.mediaItems.last().url)
+            assertEquals(imageUrl(user.id.value, 2), response.mediaItems.last().url)
             assertEquals(UploadStatus.CONSUMED, query { MediaUploadDao.findById(upload.uploadId)?.status })
             // 백그라운드 재인코딩이 끝나면 임시파일 삭제
             assertTrue(downloadedFiles.isNotEmpty() && downloadedFiles.none { it.exists() })
@@ -1020,6 +1020,6 @@ class PostServiceTest {
         request = VideoUploadPrepareRequest(mimeType = "video/mp4", size = 1000)
     )
 
-    private fun imageUrl(postId: Int, size: Int) =
-        "https://test.supabase.co/storage/v1/object/public/posts/posts/$postId/$size.jpg"
+    private fun imageUrl(userId: Int, size: Int) =
+        "https://test.supabase.co/storage/v1/object/public/posts/users/$userId/$size.jpg"
 }
