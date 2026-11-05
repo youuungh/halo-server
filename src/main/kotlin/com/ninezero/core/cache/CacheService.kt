@@ -16,10 +16,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
-class CacheService(
-    private val isEnabled: Boolean = DotenvConfig.getOrDefault("REDIS_ENABLED", "true").toBoolean(),
+class CacheService {
+    private val isEnabled: Boolean = DotenvConfig.getOrDefault("REDIS_ENABLED", "true").toBoolean()
     private val commands: () -> RedisCoroutinesCommands<String, String> = { RedisConfig.commands }
-) {
     private val logger = logger()
 
     // 장애 뒤 연결 대기 없이 캐시를 건너뛸 시각

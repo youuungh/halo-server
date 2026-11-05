@@ -45,3 +45,6 @@ data/banners.json
 
 ### Seed media (local build only) ###
 src/main/resources/seed/
+
+### Logs ###
+logs/

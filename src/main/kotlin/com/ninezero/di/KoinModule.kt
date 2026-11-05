@@ -37,7 +37,7 @@ val coreModule = module {
 
     single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.IO) }  // 백그라운드 작업
 
-    single { CacheService() }
+    singleOf(::CacheService)
     singleOf(::DeliveryApiClient)
     singleOf(::TossPaymentClient)
     singleOf(::EmailService)

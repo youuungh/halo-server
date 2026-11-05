@@ -26,6 +26,7 @@ serviceAccountKey*.json
 
 # 로그
 *.log
+logs
 
 # 데이터
 data/

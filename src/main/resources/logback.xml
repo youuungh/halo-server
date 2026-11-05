@@ -1,5 +1,4 @@
 <configuration>
-    <!-- prod 시 LOG_LEVEL=INFO -->
     <property name="LOG_LEVEL" value="${LOG_LEVEL:-DEBUG}"/>
     <property name="KTOR_LOG_LEVEL" value="${KTOR_LOG_LEVEL:-DEBUG}"/>
 
@@ -9,12 +8,34 @@
         </encoder>
     </appender>
 
+    <!-- 관리자 대시보드 로그  -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/hub.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>logs/hub.%i.log</fileNamePattern>
+            <minIndex>1</minIndex>
+            <maxIndex>2</maxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>10MB</maxFileSize>
+        </triggeringPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z',UTC} %-5level %logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <root level="${LOG_LEVEL}">
         <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
     </root>
 
     <!-- 불필요한 로그 최소화 -->
     <logger name="io.netty" level="WARN"/>
     <logger name="io.ktor.server.engine" level="${KTOR_LOG_LEVEL}"/>
     <logger name="Exposed" level="INFO"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+    <logger name="io.lettuce" level="INFO"/>
 </configuration>

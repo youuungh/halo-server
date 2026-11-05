@@ -82,6 +82,8 @@ services:
     volumes:
       - ./data:/app/data:ro
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      # 재배포해도 관리자 로그 화면의 기록이 남게
+      - ./logs:/app/logs
     networks:
       - hub-network
     restart: unless-stopped
