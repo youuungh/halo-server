@@ -31,6 +31,7 @@ fun UserDao.toUserSummaryResponse(
     followerCount: Int = 0,
     followingCount: Int = 0,
     postCount: Int = 0,
+    subscriberCount: Int? = null,
     isFollowing: Boolean? = null
 ): UserSummaryResponse {
     return UserSummaryResponse(
@@ -43,6 +44,7 @@ fun UserDao.toUserSummaryResponse(
         followerCount = followerCount,
         followingCount = followingCount,
         postCount = postCount,
+        subscriberCount = subscriberCount,
         isFollowing = isFollowing,
         isDeleted = !this.isActive
     )

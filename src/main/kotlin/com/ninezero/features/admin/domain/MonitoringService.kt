@@ -1,7 +1,9 @@
 package com.ninezero.features.admin.domain
 
 import com.ninezero.features.admin.presentation.models.response.*
+import com.sun.management.OperatingSystemMXBean
 import io.micrometer.core.instrument.MeterRegistry
+import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
 
@@ -31,6 +33,7 @@ class MonitoringService(private val registry: MeterRegistry) {
             return HttpMetricsResponse(
                 avgResponseTime = 0.0,
                 errorRate = 0.0,
+                serverErrorRate = 0.0,
                 totalRequests = 0,
                 endpointStats = emptyList()
             )
@@ -51,6 +54,10 @@ class MonitoringService(private val registry: MeterRegistry) {
             }
             .sumOf { it.count() }
         val errorRate = if (totalRequests > 0) errorCount.toDouble() / totalRequests else 0.0
+        val serverErrorCount = httpTimers
+            .filter { it.id.getTag("status")?.startsWith("5") == true }
+            .sumOf { it.count() }
+        val serverErrorRate = if (totalRequests > 0) serverErrorCount.toDouble() / totalRequests else 0.0
 
         val endpointStats = httpTimers
             .groupBy { (it.id.getTag("route") ?: "UNKNOWN").replace(Regex("/\\d+"), "/{id}") }
@@ -68,6 +75,7 @@ class MonitoringService(private val registry: MeterRegistry) {
         return HttpMetricsResponse(
             avgResponseTime = avgResponseTimeMs,
             errorRate = errorRate,
+            serverErrorRate = serverErrorRate,
             totalRequests = totalRequests,
             endpointStats = endpointStats
         )
@@ -103,12 +111,36 @@ class MonitoringService(private val registry: MeterRegistry) {
     private fun getSystemMetrics(): SystemMetricsResponse {
         val memoryMXBean = ManagementFactory.getMemoryMXBean()
         val processMemory = memoryMXBean.heapMemoryUsage.used + memoryMXBean.nonHeapMemoryUsage.used
+        val (memoryTotal, memoryAvailable) = serverMemory()
+        val root = File("/")
 
         return SystemMetricsResponse(
             uptime = ManagementFactory.getRuntimeMXBean().uptime,
             cpuUsage = registry.gaugeValue("system.cpu.usage") * 100,
-            processMemory = processMemory
+            processMemory = processMemory,
+            memoryTotal = memoryTotal,
+            memoryAvailable = memoryAvailable,
+            diskTotal = root.totalSpace,
+            diskUsable = root.usableSpace
         )
+    }
+
+    /** Linux는 MemAvailable(캐시 제외), 그 외는 OS 기본값 */
+    private fun serverMemory(): Pair<Long, Long> {
+        val meminfo = File("/proc/meminfo")
+        if (meminfo.canRead()) {
+            val kb = meminfo.readLines()
+                .mapNotNull { line ->
+                    val parts = line.split(Regex("\\s+"))
+                    parts.getOrNull(1)?.toLongOrNull()?.let { parts[0].trimEnd(':') to it * 1024 }
+                }
+                .toMap()
+            val total = kb["MemTotal"]
+            val available = kb["MemAvailable"]
+            if (total != null && available != null) return total to available
+        }
+        val os = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
+        return (os?.totalMemorySize ?: 0) to (os?.freeMemorySize ?: 0)
     }
 
     private fun MeterRegistry.gaugeValue(name: String): Double = find(name).gauge()?.value() ?: 0.0

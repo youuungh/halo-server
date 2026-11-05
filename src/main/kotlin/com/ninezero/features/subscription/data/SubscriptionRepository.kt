@@ -37,6 +37,7 @@ interface SubscriptionRepository {
     // 카운트
     suspend fun countUserSubscriptions(userId: Int, status: SubscriptionStatus?): Int
     suspend fun countCreatorSubscribers(creatorId: Int): Int
+    suspend fun countCreatorSubscribers(creatorIds: Collection<Int>): Map<Int, Int>
     suspend fun countPlanSubscribers(planId: Int): Int
     suspend fun countPlanSubscribers(planIds: Collection<Int>): Map<Int, Int>
 

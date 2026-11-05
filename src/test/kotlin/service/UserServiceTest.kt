@@ -4,6 +4,7 @@ import com.ninezero.core.common.exception.InvalidUsernameException
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.user.RefreshTokenTable
+import com.ninezero.features.subscription.data.SubscriptionRepositoryImpl
 import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.RefreshTokenRepositoryImpl
 import com.ninezero.features.user.data.UserRepositoryImpl
@@ -38,7 +39,7 @@ class UserServiceTest {
 
             coEvery { blockedUserRepository.findBlockRelatedUserIds(any()) } returns emptySet()
 
-            userService = UserService(userRepository, blockedUserRepository)
+            userService = UserService(userRepository, blockedUserRepository, SubscriptionRepositoryImpl())
         }
     }
 

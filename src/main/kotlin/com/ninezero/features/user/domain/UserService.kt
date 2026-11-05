@@ -3,6 +3,7 @@ package com.ninezero.features.user.domain
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.UserRole
 import com.ninezero.core.common.util.*
+import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.presentation.models.response.UserListResponse
@@ -16,7 +17,8 @@ import kotlin.time.Duration.Companion.days
 
 class UserService(
     private val userRepository: UserRepository,
-    private val blockedUserRepository: BlockedUserRepository
+    private val blockedUserRepository: BlockedUserRepository,
+    private val subscriptionRepository: SubscriptionRepository
 ) {
 
     suspend fun searchUsers(
@@ -80,12 +82,19 @@ class UserService(
                 role = role,
                 search = keyword
             )
+            // 구독자는 크리에이터·관리자만, 일반 유저는 null
+            val creatorIds = foundUsers
+                .filter { it.user.role == UserRole.CREATOR || it.user.role == UserRole.ADMIN }
+                .mapTo(mutableSetOf()) { it.user.id.value }
+            val subscriberCounts = subscriptionRepository.countCreatorSubscribers(creatorIds)
 
             val summaries = foundUsers.map { stats ->
+                val userId = stats.user.id.value
                 stats.user.toUserSummaryResponse(
                     followerCount = stats.followerCount,
                     followingCount = stats.followingCount,
-                    postCount = stats.postCount
+                    postCount = stats.postCount,
+                    subscriberCount = if (userId in creatorIds) subscriberCounts[userId] ?: 0 else null
                 )
             }
 

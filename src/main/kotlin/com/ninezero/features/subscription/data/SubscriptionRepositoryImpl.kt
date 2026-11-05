@@ -210,6 +210,17 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
         }.count().toInt()
     }
 
+    /** 크리에이터별 유효 구독자 수 일괄 조회 */
+    override suspend fun countCreatorSubscribers(creatorIds: Collection<Int>): Map<Int, Int> {
+        if (creatorIds.isEmpty()) return emptyMap()
+
+        return SubscriptionTable
+            .select(SubscriptionTable.creatorId, SubscriptionTable.id.count())
+            .where { (SubscriptionTable.creatorId inList creatorIds) and activeCondition(nowUtc()) }
+            .groupBy(SubscriptionTable.creatorId)
+            .associate { it[SubscriptionTable.creatorId] to it[SubscriptionTable.id.count()].toInt() }  // 0명이면 키 없음
+    }
+
     /** 플랜의 유효 구독 수 */
     override suspend fun countPlanSubscribers(planId: Int): Int {
         return SubscriptionDao.find {

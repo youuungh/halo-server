@@ -16,6 +16,7 @@ data class UserSummaryResponse(
     val followerCount: Int = 0,
     val followingCount: Int = 0,
     val postCount: Int = 0,
+    val subscriberCount: Int? = null,
     val isFollowing: Boolean? = null,
     val isDeleted: Boolean = false  // 탈퇴한 사용자
 )
