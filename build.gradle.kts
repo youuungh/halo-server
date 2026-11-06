@@ -56,7 +56,6 @@ dependencies {
     implementation(libs.swagger.models)
 
     // * 모니터링
-    implementation(libs.ktor.server.call.logging)
     implementation(libs.ktor.server.metrics.micrometer)
     implementation(libs.micrometer.registry.prometheus)
     implementation(libs.logback.classic)

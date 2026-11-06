@@ -10,5 +10,6 @@ data class LogEntryResponse(
     val level: String,
     val source: String,  // 로거 이름
     val message: String,
-    val stack: String?  // 예외 스택
+    val stack: String?,  // 예외 스택
+    val request: LogRequestResponse?  // HTTP 요청 줄만
 )

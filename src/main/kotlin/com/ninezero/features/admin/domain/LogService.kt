@@ -30,6 +30,9 @@ class LogService {
 
         // logback.xml FILE 패턴과 같아야 함
         val HEADER = Regex("""^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) (TRACE|DEBUG|INFO|WARN|ERROR)\s+(\S+) - (.*)$""")
+
+        // RequestLogging 메시지 형식과 같아야 함
+        val REQUEST = Regex("""^(\d{3})[^:]*: ([A-Z]+) - (\S+) in (\d+)ms$""")
     }
 
     private data class Entry(
@@ -178,6 +181,9 @@ class LogService {
         level = level,
         source = source,
         message = message,
-        stack = stack
+        stack = stack,
+        request = REQUEST.matchEntire(message)?.destructured?.let { (status, method, path, durationMs) ->
+            LogRequestResponse(status.toInt(), method, path, durationMs.toLong())
+        }
     )
 }
