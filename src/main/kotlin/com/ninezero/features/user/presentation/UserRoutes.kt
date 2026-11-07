@@ -25,67 +25,6 @@ fun Route.userRoutes() {
         val commentService by inject<CommentService>()
 
         authenticate("jwt", optional = true) {
-            get({
-                summary = "사용자 목록 조회 (공개)"
-                tags("Users")
-                request {
-                    queryParameter<String>("role") {
-                        description = "역할 필터 (USER, CREATOR, ADMIN)"
-                        required = false
-                        example("default") {
-                            value = "USER"
-                        }
-                    }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
-                    queryParameter<String>("search") {
-                        description = "검색어 (사용자명)"
-                        required = false
-                        example("default") {
-                            value = "rick"
-                        }
-                    }
-                    queryParameter<String>("sortBy") {
-                        description =
-                            "정렬 컬럼 (username, createdAt, role, followerCount, followingCount, postCount)"
-                        required = false
-                        example("default") {
-                            value = "createdAt"
-                        }
-                    }
-                    queryParameter<String>("sortOrder") {
-                        description = "정렬 방향 (asc, desc)"
-                        required = false
-                        example("default") {
-                            value = "desc"
-                        }
-                    }
-                }
-                apiResponse()
-                response {
-                    code(HttpStatusCode.OK) {
-                        description = "사용자 목록 조회 성공"
-                        body<ApiResponse<UserListResponse>>()
-                    }
-                }
-            }) {
-                val page = call.getIntParam("page", 1)
-                val limit = call.getIntParam("limit", Constants.DEFAULT_PAGE_LIMIT)
-                val role = call.getOptionalEnumParam<UserRole>("role")
-                val search = call.getOptionalStringParam("search")
-                val sortBy = call.getOptionalStringParam("sortBy")
-                val sortOrder = call.getOptionalStringParam("sortOrder")
-
-                val response = userService.getAllUsers(page, limit, role, search, sortBy, sortOrder)
-                call.respond(HttpStatusCode.OK, ApiResponse.success(response))
-            }
-
             get("/search", {
                 summary = "사용자 검색 (공개)"
                 tags("Users")
@@ -217,6 +156,72 @@ fun Route.userRoutes() {
         }
 
         authenticate("jwt") {
+            get({
+                summary = "사용자 목록 조회 (Admin)"
+                tags("Users")
+                request {
+                    queryParameter<String>("role") {
+                        description = "역할 필터 (USER, CREATOR, ADMIN)"
+                        required = false
+                        example("default") {
+                            value = "USER"
+                        }
+                    }
+                    queryParameter<Int>("page") {
+                        description = "페이지 번호 (기본값: 1)"
+                        required = false
+                    }
+                    queryParameter<Int>("limit") {
+                        description = "페이지 크기 (기본값: 20)"
+                        required = false
+                    }
+                    queryParameter<String>("search") {
+                        description = "검색어 (사용자명)"
+                        required = false
+                        example("default") {
+                            value = "rick"
+                        }
+                    }
+                    queryParameter<String>("sortBy") {
+                        description =
+                            "정렬 컬럼 (username, createdAt, role, followerCount, followingCount, postCount)"
+                        required = false
+                        example("default") {
+                            value = "createdAt"
+                        }
+                    }
+                    queryParameter<String>("sortOrder") {
+                        description = "정렬 방향 (asc, desc)"
+                        required = false
+                        example("default") {
+                            value = "desc"
+                        }
+                    }
+                }
+                authResponse()
+                response {
+                    code(HttpStatusCode.OK) {
+                        description = "사용자 목록 조회 성공"
+                        body<ApiResponse<UserListResponse>>()
+                    }
+                    code(HttpStatusCode.Forbidden) {
+                        description = "권한 없음"
+                    }
+                }
+            }) {
+                call.requireAdminId() ?: return@get
+
+                val page = call.getIntParam("page", 1)
+                val limit = call.getIntParam("limit", Constants.DEFAULT_PAGE_LIMIT)
+                val role = call.getOptionalEnumParam<UserRole>("role")
+                val search = call.getOptionalStringParam("search")
+                val sortBy = call.getOptionalStringParam("sortBy")
+                val sortOrder = call.getOptionalStringParam("sortOrder")
+
+                val response = userService.getAllUsers(page, limit, role, search, sortBy, sortOrder)
+                call.respond(HttpStatusCode.OK, ApiResponse.success(response))
+            }
+
             get("/admin/statistics", {
                 summary = "사용자 통계 (Admin)"
                 tags("Users")
