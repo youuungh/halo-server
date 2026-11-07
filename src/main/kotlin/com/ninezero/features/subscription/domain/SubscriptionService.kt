@@ -28,6 +28,7 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.exposed.v1.core.eq
 
 /** 구독 만료·자동 갱신 일괄 처리 결과 */
 data class SubscriptionBatchResult(

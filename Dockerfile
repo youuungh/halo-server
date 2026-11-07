@@ -1,11 +1,11 @@
 # Stage 1: Build
-FROM eclipse-temurin:17-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 COPY . .
 RUN chmod +x gradlew && ./gradlew clean build -x test --no-daemon
 
 # Stage 2: Run
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 # 비디오 메타데이터/썸네일 추출용 (ffprobe 포함)
 RUN apk add --no-cache ffmpeg

@@ -2,10 +2,10 @@ package com.ninezero.features.user.data
 
 import com.ninezero.core.database.entities.user.UserAddressDao
 import com.ninezero.core.database.entities.user.UserAddressTable
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.update
 
 class AddressRepositoryImpl : AddressRepository {
 

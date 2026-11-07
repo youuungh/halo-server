@@ -6,10 +6,12 @@ import com.ninezero.core.common.config.MediaType
 import com.ninezero.core.database.entities.upload.MediaDraftDao
 import com.ninezero.core.database.entities.upload.MediaDraftTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.update
 
 class MediaDraftRepositoryImpl : MediaDraftRepository {
 

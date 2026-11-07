@@ -4,13 +4,13 @@ import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.chat.ChatRoomDao
 import com.ninezero.core.database.entities.chat.ChatRoomTable
-import org.jetbrains.exposed.sql.Coalesce
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.v1.core.Coalesce
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.or
 
 class ChatRepositoryImpl : ChatRepository {
 

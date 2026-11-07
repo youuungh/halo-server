@@ -3,10 +3,11 @@ package com.ninezero.features.user.data
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.database.entities.user.UserSessionDao
 import com.ninezero.core.database.entities.user.UserSessionTable
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class UserSessionRepositoryImpl : UserSessionRepository {
 

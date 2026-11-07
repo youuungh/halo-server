@@ -6,10 +6,11 @@ import com.ninezero.core.database.entities.commerce.ProductDao
 import com.ninezero.core.database.entities.commerce.ProductTable
 import com.ninezero.core.database.entities.user.UserDao
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class CartRepositoryImpl : CartRepository {
 

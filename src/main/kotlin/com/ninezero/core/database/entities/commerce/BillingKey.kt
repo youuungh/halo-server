@@ -5,7 +5,7 @@ import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 
 /** 자동결제용 빌링키 */
 object BillingKeyTable : BaseIntIdTable("billing_keys") {

@@ -3,7 +3,7 @@ package com.ninezero.core.database.entities.commerce
 import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
-import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 
 object OrderItemTable : BaseIntIdTable("order_items") {
     val orderId = integer("order_id").references(OrderTable.id).index()

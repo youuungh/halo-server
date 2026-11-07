@@ -39,10 +39,10 @@ import com.ninezero.core.database.entities.user.UserSessionTable
 import com.ninezero.core.database.entities.user.UserTable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.TransactionManager
-import org.jetbrains.exposed.sql.deleteAll
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.deleteAll
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 
 /** 테스트용 인메모리 H2 데이터베이스 */
 object TestDatabase {

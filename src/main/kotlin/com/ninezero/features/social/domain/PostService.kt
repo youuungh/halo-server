@@ -33,6 +33,7 @@ import com.ninezero.features.user.presentation.models.response.UserSummaryRespon
 import com.ninezero.features.user.toUserSummaryResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.v1.core.eq
 import kotlin.time.Duration.Companion.minutes
 
 class PostService(

@@ -18,8 +18,9 @@ import com.ninezero.helper.TestFixtures
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.dao.EntityChangeType
-import org.jetbrains.exposed.dao.EntityHook
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.dao.EntityChangeType
+import org.jetbrains.exposed.v1.dao.EntityHook
 import org.junit.jupiter.api.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean

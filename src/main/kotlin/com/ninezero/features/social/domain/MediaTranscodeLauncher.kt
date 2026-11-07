@@ -11,6 +11,7 @@ import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.VideoProcessingService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.jetbrains.exposed.v1.core.eq
 
 private val transcodeLogger = logger("MediaTranscodeLauncher")
 

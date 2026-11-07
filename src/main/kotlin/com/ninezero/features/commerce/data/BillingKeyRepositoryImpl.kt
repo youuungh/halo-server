@@ -3,7 +3,8 @@ package com.ninezero.features.commerce.data
 import com.ninezero.core.common.config.BillingKeyStatus
 import com.ninezero.core.database.entities.commerce.BillingKeyDao
 import com.ninezero.core.database.entities.commerce.BillingKeyTable
-import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
 
 class BillingKeyRepositoryImpl : BillingKeyRepository {
 

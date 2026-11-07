@@ -1,7 +1,7 @@
 package com.ninezero.core.database.entities.tag
 
 import com.ninezero.core.database.entities.commerce.ProductTable
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 
 object ProductTagTable : Table("product_tags") {
     val productId = integer("product_id").references(ProductTable.id).index()

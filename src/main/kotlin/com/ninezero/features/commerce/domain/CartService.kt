@@ -23,6 +23,7 @@ import com.ninezero.features.commerce.toProductResponse
 import com.ninezero.features.subscription.data.SubscriptionPlanRepository
 import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.toUserSummaryResponse
+import org.jetbrains.exposed.v1.core.eq
 import java.math.BigDecimal
 
 class CartService(

@@ -4,6 +4,7 @@ import com.ninezero.core.common.config.UserRole
 import com.ninezero.core.common.util.UserAgentParser
 import com.ninezero.core.database.entities.user.*
 import com.ninezero.features.user.presentation.models.response.*
+import org.jetbrains.exposed.v1.core.eq
 
 /** 트랜잭션 스코프 내 호출 */
 fun UserDao.toUserResponse(): UserResponse {

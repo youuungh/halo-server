@@ -39,7 +39,8 @@ import io.ktor.serialization.kotlinx.json.DefaultJson
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
 import java.math.BigDecimal
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days

@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.exposed.v1.core.eq
 import org.junit.jupiter.api.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -216,7 +217,7 @@ class SocialLoginTest {
 
             assertTrue(!second.needsUsername)
             assertNotNull(second.auth)
-            assertEquals("socialuser", second.auth!!.user.username)
+            assertEquals("socialuser", second.auth.user.username)
         }
     }
 

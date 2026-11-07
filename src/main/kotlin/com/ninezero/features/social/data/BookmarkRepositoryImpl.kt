@@ -7,11 +7,15 @@ import com.ninezero.core.database.entities.social.BookmarkDao
 import com.ninezero.core.database.entities.social.BookmarkTable
 import com.ninezero.core.database.entities.social.CommentTable
 import com.ninezero.core.database.entities.social.PostTable
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.inSubQuery
+import org.jetbrains.exposed.v1.core.notInList
+import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.jdbc.select
 
 class BookmarkRepositoryImpl : BookmarkRepository {
 
@@ -98,7 +102,7 @@ class BookmarkRepositoryImpl : BookmarkRepository {
     }
 
     /** 유저 북마크 목록 조건 */
-    private fun SqlExpressionBuilder.userBookmarksCondition(
+    private fun userBookmarksCondition(
         userId: Int,
         targetType: BookmarkTargetType?,
         excludedAuthorIds: Set<Int>

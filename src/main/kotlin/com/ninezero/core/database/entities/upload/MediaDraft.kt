@@ -7,8 +7,8 @@ import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.datetime.datetime
 
 object MediaDraftTable : BaseIntIdTable("media_drafts") {
     val userId = integer("user_id").references(UserTable.id)

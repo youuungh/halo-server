@@ -3,9 +3,9 @@ package com.ninezero.features.user.data
 import com.ninezero.core.common.config.SocialProvider
 import com.ninezero.core.database.entities.user.SocialAccountDao
 import com.ninezero.core.database.entities.user.SocialAccountTable
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class SocialAccountRepositoryImpl : SocialAccountRepository {
 

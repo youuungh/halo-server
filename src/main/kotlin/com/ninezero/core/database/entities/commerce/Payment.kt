@@ -6,8 +6,8 @@ import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
 import com.ninezero.core.database.entities.subscription.SubscriptionTable
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.datetime.datetime
 
 object PaymentTable : BaseIntIdTable("payments") {
     val orderId = integer("order_id").references(OrderTable.id).nullable().index()  // 주문별 결제 조회

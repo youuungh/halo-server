@@ -23,6 +23,7 @@ import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.presentation.models.request.UpdateProfileRequest
 import com.ninezero.features.user.presentation.models.response.ProfileResponse
 import com.ninezero.features.user.toProfileResponse
+import org.jetbrains.exposed.v1.core.eq
 import kotlin.time.Duration.Companion.minutes
 
 class ProfileService(

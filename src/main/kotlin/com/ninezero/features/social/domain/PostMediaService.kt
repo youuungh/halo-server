@@ -26,7 +26,8 @@ import com.ninezero.features.upload.presentation.models.response.UploadPrepareRe
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
 import kotlinx.coroutines.CoroutineScope
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
 
 /** 포스트 수정 시 미디어 교체와 영상 직접 업로드 준비 */
 class PostMediaService(

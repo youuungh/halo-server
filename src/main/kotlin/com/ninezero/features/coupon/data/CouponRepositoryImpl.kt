@@ -8,9 +8,11 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.coupon.CouponDao
 import com.ninezero.core.database.entities.coupon.CouponTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.jdbc.update
 import java.math.BigDecimal
 
 class CouponRepositoryImpl : CouponRepository {

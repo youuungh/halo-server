@@ -8,8 +8,9 @@ import com.ninezero.core.database.entities.tag.PostTagTable
 import com.ninezero.core.database.entities.tag.ProductTagTable
 import com.ninezero.core.database.entities.tag.TagDao
 import com.ninezero.core.database.entities.tag.TagTable
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.*
 
 class TagRepositoryImpl : TagRepository {
 

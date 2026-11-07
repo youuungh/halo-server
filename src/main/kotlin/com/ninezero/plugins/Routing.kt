@@ -41,7 +41,7 @@ import io.ktor.server.plugins.requestvalidation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.jetbrains.exposed.exceptions.ExposedSQLException
+import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 
 /** 유니크 위반 SQLSTATE */
 private const val UNIQUE_VIOLATION_SQL_STATE = "23505"

@@ -16,7 +16,8 @@ import com.ninezero.helper.TestFixtures.plusDays
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.update
 import org.junit.jupiter.api.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

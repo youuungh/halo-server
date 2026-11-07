@@ -5,11 +5,15 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.point.PointHistoryDao
 import com.ninezero.core.database.entities.point.PointHistoryTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import java.math.BigDecimal
 
 class PointHistoryRepositoryImpl : PointHistoryRepository {
@@ -92,11 +96,11 @@ class PointHistoryRepositoryImpl : PointHistoryRepository {
         startDate: LocalDateTime?,
         endDate: LocalDateTime?,
         type: PointType?
-    ): Op<Boolean> = Op.build {
+    ): Op<Boolean> {
         var condition: Op<Boolean> = PointHistoryTable.userId eq userId
         startDate?.let { condition = condition and (PointHistoryTable.createdAt greaterEq it) }
         endDate?.let { condition = condition and (PointHistoryTable.createdAt less it) }  // 끝은 미만
         type?.let { condition = condition and (PointHistoryTable.type eq it) }
-        condition
+        return condition
     }
 }

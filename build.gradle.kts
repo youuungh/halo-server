@@ -14,6 +14,7 @@ application {
 }
 
 kotlin {
+    jvmToolchain(21)
     compilerOptions {
         allWarningsAsErrors = true
         freeCompilerArgs.add("-opt-in=kotlin.time.ExperimentalTime")

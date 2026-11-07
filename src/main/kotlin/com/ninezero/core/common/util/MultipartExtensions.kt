@@ -24,7 +24,7 @@ suspend fun ApplicationCall.receiveFileParts(
             is PartData.FormItem -> onFormItem(part.name, part.value)
             else -> Unit
         }
-        part.dispose()
+        part.release()
     }
 
     return files to contentTypes  // 두 목록은 인덱스로 대응
@@ -32,4 +32,4 @@ suspend fun ApplicationCall.receiveFileParts(
 
 /** 크기 검증용 한도 + 1바이트까지 읽기 */
 private suspend fun PartData.FileItem.readCapped(maxBytes: Long): ByteArray =
-    provider().readRemaining(maxBytes + 1).readByteArray()
+    provider().readBuffer(maxBytes + 1).readByteArray()

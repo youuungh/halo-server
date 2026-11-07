@@ -2,6 +2,7 @@ package com.ninezero.features.commerce.data
 
 import com.ninezero.core.database.entities.commerce.PaymentCustomerDao
 import com.ninezero.core.database.entities.commerce.PaymentCustomerTable
+import org.jetbrains.exposed.v1.core.eq
 
 class PaymentCustomerRepositoryImpl : PaymentCustomerRepository {
 

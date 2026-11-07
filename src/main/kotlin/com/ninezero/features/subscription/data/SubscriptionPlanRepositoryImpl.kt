@@ -5,9 +5,12 @@ import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.subscription.SubscriptionPlanDao
 import com.ninezero.core.database.entities.subscription.SubscriptionPlanTable
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.jdbc.update
 import java.math.BigDecimal
 
 class SubscriptionPlanRepositoryImpl : SubscriptionPlanRepository {

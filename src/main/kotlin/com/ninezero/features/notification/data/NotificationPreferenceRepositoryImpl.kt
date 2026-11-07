@@ -2,6 +2,8 @@ package com.ninezero.features.notification.data
 
 import com.ninezero.core.database.entities.notification.NotificationPreferenceDao
 import com.ninezero.core.database.entities.notification.NotificationPreferenceTable
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 
 class NotificationPreferenceRepositoryImpl : NotificationPreferenceRepository {
 

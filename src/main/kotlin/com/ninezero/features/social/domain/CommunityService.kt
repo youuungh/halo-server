@@ -44,6 +44,7 @@ import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.exposed.v1.core.eq
 import kotlin.time.Duration.Companion.minutes
 
 class CommunityService(

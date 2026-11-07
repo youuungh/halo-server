@@ -4,7 +4,7 @@ import com.ninezero.core.common.config.MediaType
 import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
-import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 
 object PostMediaTable : BaseIntIdTable("post_media") {
     val postId = integer("post_id").references(PostTable.id)

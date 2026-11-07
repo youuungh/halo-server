@@ -10,14 +10,18 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.social.CommentDao
 import com.ninezero.core.database.entities.social.CommentTable
 import com.ninezero.core.database.entities.social.PostTable
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.minus
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.core.plus
+import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.update
 
 class CommentRepositoryImpl : CommentRepository {
 
@@ -243,7 +247,7 @@ class CommentRepositoryImpl : CommentRepository {
     }
 }
 
-private fun SqlExpressionBuilder.visibleToViewer(viewerId: Int?): Op<Boolean> =
+private fun visibleToViewer(viewerId: Int?): Op<Boolean> =
     if (viewerId == null) {
         CommentTable.isActive eq true
     } else {
@@ -252,9 +256,9 @@ private fun SqlExpressionBuilder.visibleToViewer(viewerId: Int?): Op<Boolean> =
     }
 
 /** 활성 댓글과 삭제·블라인드 자리 */
-private fun SqlExpressionBuilder.shownInThread(): Op<Boolean> =
+private fun shownInThread(): Op<Boolean> =
     (CommentTable.isActive eq true) or (CommentTable.isDeleted eq true)
 
 /** 댓글·답글 목록용, 삭제·블라인드 자리 포함 */
-private fun SqlExpressionBuilder.visibleInThread(viewerId: Int?): Op<Boolean> =
+private fun visibleInThread(viewerId: Int?): Op<Boolean> =
     visibleToViewer(viewerId) or (CommentTable.isDeleted eq true)

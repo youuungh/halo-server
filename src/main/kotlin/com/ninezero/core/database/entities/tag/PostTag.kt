@@ -1,7 +1,7 @@
 package com.ninezero.core.database.entities.tag
 
 import com.ninezero.core.database.entities.social.PostTable
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 
 object PostTagTable : Table("post_tags") {
     val postId = integer("post_id").references(PostTable.id).index()  // 포스트별 태그 조회 최적화

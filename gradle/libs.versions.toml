@@ -1,44 +1,44 @@
 [versions]
 # Core
-kotlin = "2.2.20"
-ktor = "3.3.0"
+kotlin = "2.4.21"
+ktor = "3.6.1"
 
 # DB
-exposed = "0.61.0"
-postgres = "42.7.13"
+exposed = "1.6.1"
+postgres = "42.7.14"
 h2 = "2.3.232"
-hikaricp = "7.0.2"
-flyway = "11.17.0"
+hikaricp = "7.1.0"
+flyway = "11.20.3"
 
 # Security & Utils
 bcrypt = "0.10.2"
-jwks-rsa = "0.22.2"
-kotlinx-datetime = "0.7.1-0.6.x-compat"
+jwks-rsa = "0.24.2"
+kotlinx-datetime = "0.8.0-0.6.x-compat"
 dotenv = "6.5.1"
 
 # DI & Storage
-koin = "4.1.1"
+koin = "4.2.2"
 supabase = "3.2.3"
-twelvemonkeys = "3.15.0"
+twelvemonkeys = "3.15.3"
 
 # Monitoring & Logging
-logback = "1.5.38"
-prometheus = "1.15.3"
+logback = "1.6.6"
+prometheus = "1.17.2"
 
 # Redis & Coroutines
-lettuce = "7.0.0.RELEASE"
-kotlinx-coroutines = "1.10.2"
+lettuce = "7.9.0.RELEASE"
+kotlinx-coroutines = "1.11.0"
 
 # Firebase
-firebase-admin = "9.10.0"
+firebase-admin = "9.11.0"
 
 # Testing
-mockk = "1.13.8"
+mockk = "1.14.11"
 
 # API Doc
-ktor-openapi-tools = "5.6.0"
-schema-kenerator = "2.6.0"
-swagger-models = "2.2.34"
+ktor-openapi-tools = "5.7.0"
+schema-kenerator = "2.7.2"
+swagger-models = "2.2.45"
 
 [libraries]
 # 서버 핵심

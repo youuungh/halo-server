@@ -13,7 +13,8 @@ import com.ninezero.core.database.entities.social.*
 import com.ninezero.features.social.presentation.models.response.*
 import com.ninezero.features.user.presentation.models.response.UserPreviewResponse
 import com.ninezero.features.user.presentation.models.response.UserSummaryResponse
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.inList
 
 /** 미디어 편집 keep/reorder/삭제 계획 */
 data class MediaEditPlan<T : BaseIntEntity>(

@@ -8,11 +8,15 @@ import com.ninezero.core.database.entities.social.CommentTable
 import com.ninezero.core.database.entities.social.LikeDao
 import com.ninezero.core.database.entities.social.LikeTable
 import com.ninezero.core.database.entities.social.PostTable
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.inSubQuery
+import org.jetbrains.exposed.v1.core.notInList
+import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.jdbc.select
 
 class LikeRepositoryImpl : LikeRepository {
 
@@ -118,7 +122,7 @@ class LikeRepositoryImpl : LikeRepository {
     }
 
     /** 대상 좋아요 목록·수 공통 조건 */
-    private fun SqlExpressionBuilder.targetLikesCondition(
+    private fun targetLikesCondition(
         targetType: LikeType,
         targetId: Int,
         excludedUserIds: Set<Int>
@@ -128,7 +132,7 @@ class LikeRepositoryImpl : LikeRepository {
             (LikeTable.userId notInList excludedUserIds)
 
     /** 유저 좋아요 목록 조건 */
-    private fun SqlExpressionBuilder.userLikesCondition(
+    private fun userLikesCondition(
         userId: Int,
         targetType: LikeType?,
         excludedAuthorIds: Set<Int>

@@ -9,14 +9,16 @@ import com.ninezero.core.database.entities.commerce.ReviewDao
 import com.ninezero.core.database.entities.commerce.ReviewTable
 import com.ninezero.core.database.entities.user.UserDao
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.avg
-import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.avg
+import org.jetbrains.exposed.v1.core.count
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.jdbc.select
 
 class ReviewRepositoryImpl : ReviewRepository {
 

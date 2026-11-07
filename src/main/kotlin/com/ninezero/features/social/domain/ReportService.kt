@@ -28,6 +28,7 @@ import com.ninezero.features.social.presentation.models.response.ReportedTargetR
 import com.ninezero.features.social.toMediaItemResponse
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
+import org.jetbrains.exposed.v1.core.eq
 
 /** 블라인드로 캐시를 지울 포스트 */
 private data class AffectedPost(

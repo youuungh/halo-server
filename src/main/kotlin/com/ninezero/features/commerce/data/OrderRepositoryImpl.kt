@@ -15,8 +15,9 @@ import com.ninezero.core.common.util.decodeJsonToList
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.database.entities.commerce.*
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.inSubQuery
+import org.jetbrains.exposed.v1.jdbc.*
 import java.math.BigDecimal
 import java.math.RoundingMode
 

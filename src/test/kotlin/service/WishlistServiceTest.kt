@@ -15,12 +15,13 @@ import com.ninezero.helper.TestDatabase
 import com.ninezero.helper.TestFixtures
 import kotlinx.coroutines.runBlocking
 import com.ninezero.core.database.entities.commerce.WishlistTable
-import org.jetbrains.exposed.dao.EntityChangeType
-import org.jetbrains.exposed.dao.EntityHook
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.dao.EntityChangeType
+import org.jetbrains.exposed.v1.dao.EntityHook
+import org.jetbrains.exposed.v1.jdbc.update
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
-import org.jetbrains.exposed.sql.update
 import org.junit.jupiter.api.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -11,6 +11,7 @@ import com.ninezero.features.commerce.data.BillingKeyRepository
 import com.ninezero.features.commerce.data.PaymentCustomerRepository
 import com.ninezero.features.commerce.presentation.models.response.BillingKeyResponse
 import com.ninezero.features.commerce.toBillingKeyResponse
+import org.jetbrains.exposed.v1.core.eq
 import java.util.UUID
 
 /** 빌링키 관리, 청구는 SubscriptionPaymentService */

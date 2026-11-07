@@ -4,10 +4,10 @@ import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.search.SearchHistoryDao
 import com.ninezero.core.database.entities.search.SearchHistoryTable
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class SearchHistoryRepositoryImpl : SearchHistoryRepository {
 

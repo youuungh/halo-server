@@ -2,13 +2,13 @@ package com.ninezero.core.database.entities.base
 
 import com.ninezero.core.common.util.nowUtc
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.dao.EntityBatchUpdate
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
+import org.jetbrains.exposed.v1.dao.EntityBatchUpdate
+import org.jetbrains.exposed.v1.dao.IntEntity
+import org.jetbrains.exposed.v1.dao.IntEntityClass
+import org.jetbrains.exposed.v1.datetime.datetime
 
 abstract class BaseIntIdTable(name: String) : IntIdTable(name) {
     val createdAt: Column<LocalDateTime> = datetime("created_at")

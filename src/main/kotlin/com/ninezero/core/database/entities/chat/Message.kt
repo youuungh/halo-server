@@ -7,8 +7,8 @@ import com.ninezero.core.database.entities.base.BaseIntIdTable
 import com.ninezero.core.database.entities.commerce.ProductTable
 import com.ninezero.core.database.entities.social.PostTable
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.datetime.datetime
 
 object MessageTable : BaseIntIdTable("messages") {
     val roomId = integer("room_id").references(ChatRoomTable.id)

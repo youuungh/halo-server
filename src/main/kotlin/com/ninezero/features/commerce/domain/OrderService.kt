@@ -889,7 +889,6 @@ class OrderService(
                     OrderStatus.CANCELLED -> notificationService.sendOrderCancelledNotification(
                         recipientId = buyerUserId, cancelledById = creatorId, orderId = orderId
                     )
-                    else -> {}
                 }
             } catch (e: Exception) {
                 logger.error("주문 상태 변경 알림 전송 실패: orderId=$orderId, error=${e.message}", e)

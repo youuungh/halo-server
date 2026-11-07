@@ -2,6 +2,7 @@ package com.ninezero.features.point.data
 
 import com.ninezero.core.database.entities.point.PointDao
 import com.ninezero.core.database.entities.point.PointTable
+import org.jetbrains.exposed.v1.core.eq
 import java.math.BigDecimal
 
 class PointRepositoryImpl : PointRepository {

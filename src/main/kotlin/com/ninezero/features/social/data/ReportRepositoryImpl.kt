@@ -4,9 +4,11 @@ import com.ninezero.core.common.config.ReportTargetType
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.social.ReportDao
 import com.ninezero.core.database.entities.social.ReportTable
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.count
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.select
 
 class ReportRepositoryImpl : ReportRepository {
 

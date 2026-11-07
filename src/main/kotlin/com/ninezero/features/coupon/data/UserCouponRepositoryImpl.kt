@@ -6,21 +6,22 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.coupon.UserCouponDao
 import com.ninezero.core.database.entities.coupon.UserCouponTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.update
 
 class UserCouponRepositoryImpl : UserCouponRepository {
 
     // 발급 중지된 쿠폰도 받은 쿠폰은 만료일까지 사용
-    private fun availableCondition(userId: Int, now: LocalDateTime): Op<Boolean> = Op.build {
+    private fun availableCondition(userId: Int, now: LocalDateTime): Op<Boolean> =
         (UserCouponTable.userId eq userId) and
                 (UserCouponTable.status eq UserCouponStatus.AVAILABLE) and
                 (UserCouponTable.expiresAt greaterEq now)
-    }
 
     /** 사용자 쿠폰 발급 */
     override suspend fun create(

@@ -4,10 +4,12 @@ import com.ninezero.core.database.entities.user.RefreshTokenDao
 import com.ninezero.core.database.entities.user.RefreshTokenTable
 import com.ninezero.core.security.TokenHasher
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.update
 
 class RefreshTokenRepositoryImpl : RefreshTokenRepository {
 

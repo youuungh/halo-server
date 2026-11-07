@@ -12,8 +12,10 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.inTopLevelSuspendTransaction
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -122,7 +124,7 @@ inline fun <reified T : Enum<T>> ApplicationCall.getOptionalEnumParam(name: Stri
 // 트랜잭션
 
 suspend fun <T> query(block: suspend () -> T): T {
-    return newSuspendedTransaction(Dispatchers.IO) { block() }  // 중첩·currentOrNull 직접 체크 금지
+    return withContext(Dispatchers.IO) { inTopLevelSuspendTransaction { block() } }  // 중첩·currentOrNull 직접 체크 금지
 }
 
 // ILIKE

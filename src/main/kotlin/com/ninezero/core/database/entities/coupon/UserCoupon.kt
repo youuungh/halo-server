@@ -4,8 +4,8 @@ import com.ninezero.core.common.config.UserCouponStatus
 import com.ninezero.core.database.entities.base.BaseIntEntity
 import com.ninezero.core.database.entities.base.BaseIntEntityClass
 import com.ninezero.core.database.entities.base.BaseIntIdTable
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.datetime.datetime
 
 object UserCouponTable : BaseIntIdTable("user_coupons") {
     val userId = integer("user_id")

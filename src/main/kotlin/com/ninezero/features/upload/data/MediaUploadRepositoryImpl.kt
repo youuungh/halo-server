@@ -5,12 +5,12 @@ import com.ninezero.core.common.config.UploadStatus
 import com.ninezero.core.database.entities.upload.MediaUploadDao
 import com.ninezero.core.database.entities.upload.MediaUploadTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class MediaUploadRepositoryImpl : MediaUploadRepository {
 

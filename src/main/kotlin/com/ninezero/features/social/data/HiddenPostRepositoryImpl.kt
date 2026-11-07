@@ -2,7 +2,8 @@ package com.ninezero.features.social.data
 
 import com.ninezero.core.database.entities.social.HiddenPostDao
 import com.ninezero.core.database.entities.social.HiddenPostTable
-import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
 
 class HiddenPostRepositoryImpl : HiddenPostRepository {
 

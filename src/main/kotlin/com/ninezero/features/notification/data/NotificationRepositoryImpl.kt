@@ -7,11 +7,13 @@ import com.ninezero.core.common.util.afterNewest
 import com.ninezero.core.database.entities.notification.NotificationDao
 import com.ninezero.core.database.entities.notification.NotificationTable
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.batchInsert
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.jdbc.batchInsert
+import org.jetbrains.exposed.v1.jdbc.update
 
 class NotificationRepositoryImpl : NotificationRepository {
 

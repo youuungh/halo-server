@@ -10,7 +10,8 @@ import com.ninezero.core.database.entities.social.FollowDao
 import com.ninezero.core.database.entities.social.FollowTable
 import com.ninezero.core.database.entities.user.UserProfileTable
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
 
 class FollowRepositoryImpl : FollowRepository {
 

@@ -7,10 +7,11 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.social.FollowTable
 import com.ninezero.core.database.entities.user.UserDao
 import com.ninezero.core.database.entities.user.UserTable
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.notInList
+import org.jetbrains.exposed.v1.jdbc.*
 
 class CreatorSearchRepositoryImpl : CreatorSearchRepository {
 

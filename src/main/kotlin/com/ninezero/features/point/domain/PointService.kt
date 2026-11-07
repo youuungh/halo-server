@@ -23,6 +23,7 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.exposed.v1.core.eq
 import java.math.BigDecimal
 import kotlin.time.Duration.Companion.days
 

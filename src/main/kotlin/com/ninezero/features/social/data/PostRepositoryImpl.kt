@@ -19,9 +19,10 @@ import com.ninezero.core.database.entities.social.PostTable
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.minus
+import org.jetbrains.exposed.v1.core.plus
+import org.jetbrains.exposed.v1.jdbc.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
@@ -241,7 +242,7 @@ class PostRepositoryImpl : PostRepository {
         userId: Int,
         contextType: PostContextType?,
         includeBlindedForAuthor: Boolean
-    ): Op<Boolean> = SqlExpressionBuilder.run {
+    ): Op<Boolean> {
         // includeBlindedForAuthor = 본인 블라인드 글 포함
         val visible = if (includeBlindedForAuthor) {
             (PostTable.isActive eq true) or (PostTable.isBlinded eq true)
@@ -250,7 +251,7 @@ class PostRepositoryImpl : PostRepository {
         }
 
         val mine = (PostTable.userId eq userId) and visible
-        when (contextType) {
+        return when (contextType) {
             null -> mine
             PostContextType.COMMUNITY -> mine and (PostTable.contextType eq PostContextType.COMMUNITY)
             else -> mine and (PostTable.contextType neq PostContextType.COMMUNITY)
@@ -344,14 +345,13 @@ class PostRepositoryImpl : PostRepository {
     private fun communityPostsCondition(
         creatorId: Int,
         excludedAuthorIds: Set<Int>
-    ): Op<Boolean> = SqlExpressionBuilder.run {
+    ): Op<Boolean> =
         (PostTable.creatorId eq creatorId) and
                 (PostTable.contextType eq PostContextType.COMMUNITY) and
                 // 비밀글도 노출
                 (PostTable.isPinnedInCommunity eq false) and  // 고정 제외
                 (PostTable.isActive eq true) and
                 (PostTable.userId notInList excludedAuthorIds)
-    }
 
     /** 크리에이터 커뮤니티의 포스트 목록 */
     override suspend fun findCommunityPosts(
@@ -387,12 +387,10 @@ class PostRepositoryImpl : PostRepository {
         }
         val count = cursor.int(0)
         val lastId = cursor.int(1)
-        return SqlExpressionBuilder.run {
-            afterCursor(
-                (countColumn less count) to (countColumn eq count),
-                (PostTable.id less lastId) to (PostTable.id eq lastId)
-            )
-        }
+        return afterCursor(
+            (countColumn less count) to (countColumn eq count),
+            (PostTable.id less lastId) to (PostTable.id eq lastId)
+        )
     }
 
     /** 크리에이터의 contextType별 포스트 목록 */

@@ -6,6 +6,7 @@ import com.ninezero.core.common.exception.OrderNotFoundException
 import com.ninezero.core.database.entities.commerce.OrderDao
 import com.ninezero.core.database.entities.commerce.OrderTable
 import com.ninezero.features.commerce.data.OrderRepository
+import org.jetbrains.exposed.v1.core.eq
 
 /** 주문 잠금 후 최신 상태 재조회 */
 internal fun lockOrder(orderId: Int): OrderDao =

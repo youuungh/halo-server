@@ -41,7 +41,8 @@ import com.ninezero.features.user.toUserPreviewResponse
 import com.ninezero.features.user.toUserSummaryResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
 
 class CommentService(
     private val commentRepository: CommentRepository,
