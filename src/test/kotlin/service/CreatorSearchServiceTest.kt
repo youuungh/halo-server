@@ -2,6 +2,8 @@ package com.ninezero.service
 
 import com.ninezero.core.cache.CacheService
 import com.ninezero.core.common.exception.InvalidSearchQueryException
+import com.ninezero.core.common.util.query
+import com.ninezero.core.database.entities.user.UserProfileDao
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
 import com.ninezero.features.search.data.CreatorSearchRepositoryImpl
 import com.ninezero.features.search.data.SearchHistoryRepositoryImpl
@@ -105,6 +107,32 @@ class CreatorSearchServiceTest {
             // Then
             assertEquals(2, response.items.size)
             assertTrue(response.items.any { it.username.contains("test") })
+        }
+    }
+
+    @Test
+    fun `크리에이터 검색 성공 - 표시 이름으로 검색`() {
+        runBlocking {
+            // Given
+            val amari = TestFixtures.createTestCreator(email = "amari@test.com", username = "amari_28")
+            val onyx = TestFixtures.createTestCreator(email = "onyx@test.com", username = "0nyx_cat")
+            query {
+                UserProfileDao.new { userId = amari.id; displayName = "아마리" }
+                UserProfileDao.new { userId = onyx.id; displayName = "오닉스" }
+            }
+            val viewer = TestFixtures.createTestUser(email = "viewer@test.com", username = "viewer")
+
+            // When
+            val response = creatorSearchService.searchCreators(
+                keyword = "아마",
+                currentUserId = viewer.id.value,
+                page = 1,
+                limit = 10
+            )
+
+            // Then
+            assertEquals(listOf("amari_28"), response.items.map { it.username })
+            assertEquals(1, response.totalCount)
         }
     }
 

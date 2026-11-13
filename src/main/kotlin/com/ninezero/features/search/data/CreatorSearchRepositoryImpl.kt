@@ -6,6 +6,7 @@ import com.ninezero.core.common.util.ilike
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.social.FollowTable
 import com.ninezero.core.database.entities.user.UserDao
+import com.ninezero.core.database.entities.user.UserProfileTable
 import com.ninezero.core.database.entities.user.UserTable
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.eq
@@ -17,9 +18,12 @@ class CreatorSearchRepositoryImpl : CreatorSearchRepository {
 
     /** 크리에이터 검색 공통 조건 */
     private fun buildKeywordCondition(keyword: String, excludeUserIds: Set<Int>): Op<Boolean> {
+        val pattern = containsLikePattern(keyword)
+        val displayNameMatches = UserProfileTable.select(UserProfileTable.userId)
+            .where { UserProfileTable.displayName ilike pattern }
         var condition: Op<Boolean> = (UserTable.role eq UserRole.CREATOR) and
                 (UserTable.isActive eq true) and
-                (UserTable.username ilike containsLikePattern(keyword))
+                ((UserTable.username ilike pattern) or (UserTable.id inSubQuery displayNameMatches))
 
         if (excludeUserIds.isNotEmpty()) {
             condition = condition and (UserTable.id notInList excludeUserIds)

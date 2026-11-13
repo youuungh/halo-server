@@ -6,11 +6,14 @@ import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.coupon.UserCouponDao
 import com.ninezero.core.database.entities.coupon.UserCouponTable
 import kotlinx.datetime.LocalDateTime
+import org.jetbrains.exposed.v1.core.CaseWhenElse
+import org.jetbrains.exposed.v1.core.Coalesce
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.intLiteral
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.update
@@ -102,8 +105,18 @@ class UserCouponRepositoryImpl : UserCouponRepository {
 
     /** 사용자 쿠폰 지갑 목록 조회 */
     override suspend fun findByUserId(userId: Int, page: Int, limit: Int): List<UserCouponDao> {
+        val available = availableCondition(userId, nowUtc())
+        val group = CaseWhenElse(listOf(available to intLiteral(0)), intLiteral(1))
+        val availableOrder = CaseWhenElse<LocalDateTime?>(listOf(available to UserCouponTable.expiresAt), Op.nullOp())
+        val pastOrder = Coalesce(UserCouponTable.usedAt, UserCouponTable.expiresAt)  // usedAt은 사용완료 때만 기록
+
         return UserCouponDao.find { UserCouponTable.userId eq userId }
-            .orderBy(UserCouponTable.claimedAt to SortOrder.DESC, UserCouponTable.id to SortOrder.DESC)  // claimedAt desc
+            .orderBy(
+                group to SortOrder.ASC,  // 사용 가능 먼저
+                availableOrder to SortOrder.ASC,  // 만료 임박순
+                pastOrder to SortOrder.DESC,  // 지난 쿠폰은 사용일·만료일 최신순
+                UserCouponTable.id to SortOrder.DESC
+            )
             .limit(limit).offset(page.toOffset(limit))
             .toList()
     }
@@ -120,10 +133,12 @@ class UserCouponRepositoryImpl : UserCouponRepository {
 
     /** 사용자의 status별 쿠폰 목록 조회 */
     override suspend fun findByUserIdAndStatus(userId: Int, status: UserCouponStatus, page: Int, limit: Int): List<UserCouponDao> {
+        val sortDate = if (status == UserCouponStatus.USED) UserCouponTable.usedAt else UserCouponTable.expiresAt
+
         return UserCouponDao.find {
             (UserCouponTable.userId eq userId) and (UserCouponTable.status eq status)  // 발행 쿠폰 상태 무관
         }
-            .orderBy(UserCouponTable.claimedAt to SortOrder.DESC, UserCouponTable.id to SortOrder.DESC)  // claimedAt desc
+            .orderBy(sortDate to SortOrder.DESC_NULLS_LAST, UserCouponTable.id to SortOrder.DESC)  // 사용일·만료일 최신순
             .limit(limit).offset(page.toOffset(limit))
             .toList()
     }
