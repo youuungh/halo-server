@@ -3,15 +3,10 @@ package com.ninezero.features.search.domain
 import com.ninezero.core.cache.CacheKeys
 import com.ninezero.core.cache.CacheService
 import com.ninezero.core.common.config.Constants
-import com.ninezero.core.common.util.PaginationInfo
-import com.ninezero.core.common.util.ValidationUtils
-import com.ninezero.core.common.util.createPagedResponse
-import com.ninezero.core.common.util.query
-import com.ninezero.core.common.util.validatePaginationParams
+import com.ninezero.core.common.util.*
 import com.ninezero.features.commerce.data.ProductRepository
 import com.ninezero.features.search.data.CreatorSearchRepository
 import com.ninezero.features.search.presentation.models.response.CreatorSearchListResponse
-import com.ninezero.features.search.presentation.models.response.CreatorSearchResponse
 import com.ninezero.features.search.toCreatorSearchResponse
 import com.ninezero.features.social.data.FollowRepository
 import com.ninezero.features.social.data.PostRepository
@@ -42,7 +37,7 @@ class CreatorSearchService(
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
         val searchResponse = query {
-            // 차단된 사용자를 쿼리/카운트에서 동일하게 제외
+            // 차단된 사용자를 쿼리·카운트에서 동일하게 제외
             val blockedUserIds = if (currentUserId != null) {
                 blockedUserRepository.findBlockRelatedUserIds(currentUserId)
             } else {
@@ -60,7 +55,7 @@ class CreatorSearchService(
 
             if (filteredCreators.isEmpty()) {
                 val pagination = PaginationInfo(validPage, validLimit, totalCount)
-                return@query createPagedResponse(emptyList<CreatorSearchResponse>(), pagination)
+                return@query createPagedResponse(emptyList(), pagination)
             }
 
             val creatorIds = filteredCreators.map { it.id.value }
@@ -157,7 +152,7 @@ class CreatorSearchService(
 
             if (filteredCreators.isEmpty()) {
                 val pagination = PaginationInfo(1, validLimit, 0)
-                return@query createPagedResponse(emptyList<CreatorSearchResponse>(), pagination)
+                return@query createPagedResponse(emptyList(), pagination)
             }
 
             val creatorIds = filteredCreators.map { it.id.value }

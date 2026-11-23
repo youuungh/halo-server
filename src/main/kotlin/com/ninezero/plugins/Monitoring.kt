@@ -34,7 +34,7 @@ private val RequestLogging = createApplicationPlugin("RequestLogging") {
 
         val status = call.response.status()
         val elapsedMs = call.attributes.getOrNull(callStartKey)?.let { (System.nanoTime() - it) / 1_000_000 } ?: 0
-        // LogService REQUEST 정규식과 같아야 함
+        // LogService REQUEST와 같은 정규식
         val message = "${status ?: "Unhandled"}: ${call.request.httpMethod.value} - $path in ${elapsedMs}ms"
         val code = status?.value ?: 0
         when {

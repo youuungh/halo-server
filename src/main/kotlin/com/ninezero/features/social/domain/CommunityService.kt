@@ -62,7 +62,7 @@ class CommunityService(
     private val cacheService: CacheService,
     private val coroutineScope: CoroutineScope
 ) {
-    // 커뮤니티 글 생성/수정/삭제
+    // 커뮤니티 글 생성·수정·삭제
     suspend fun createCommunityPost(
         userId: Int,
         creatorId: Int,
@@ -94,7 +94,7 @@ class CommunityService(
                     (user.role == UserRole.CREATOR || user.role == UserRole.ADMIN)
             val isFollower = followRepository.isFollowing(userId, creatorId)
 
-            if (!isCreator && !isFollower) {  // 팔로워/크리에이터만
+            if (!isCreator && !isFollower) {  // 팔로워·크리에이터만
                 throw ForbiddenException(Errors.Social.Community.ONLY_FOLLOWERS_CAN_POST)
             }
 
@@ -177,7 +177,7 @@ class CommunityService(
             val isCreator = post.creatorId == userId &&
                     (user.role == UserRole.CREATOR || user.role == UserRole.ADMIN)
 
-            if (!isAuthor && !isCreator) {  // 작성자/크리에이터/관리자만
+            if (!isAuthor && !isCreator) {  // 작성자·크리에이터·관리자만
                 throw ForbiddenException(Errors.Social.Post.POST_DELETE_PERMISSION_DENIED)
             }
 
@@ -232,7 +232,7 @@ class CommunityService(
                 emptySet()
             }
 
-            // 차단 글은 쿼리에서 빼 페이지 채움, 관심없음은 피드에서만
+            // 차단 글은 쿼리에서 제외하고 페이지 채움, 관심없음은 피드에서만
             val (communityPosts, nextCursor) = postRepository.findCommunityPosts(
                 creatorId = creatorId,
                 cursor = pageCursor,

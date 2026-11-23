@@ -76,7 +76,7 @@ class ReportService(
         val rows = reportRepository.findReportedTargets(targetType, validPage, validLimit)
         val total = reportRepository.countReportedTargets(targetType)
 
-        // 포스트/댓글은 최신 상태로 갱신, 타입별로 한 번에 조회
+        // 포스트·댓글은 최신 상태로 갱신, 타입별로 한 번에 조회
         val postStates = postRepository
             .findPostsByIdsWithDeleted(rows.filter { it.targetType == ReportTargetType.POST }.map { it.targetId })
             .associate { it.id.value to (it.isBlinded to it.moderationLocked) }

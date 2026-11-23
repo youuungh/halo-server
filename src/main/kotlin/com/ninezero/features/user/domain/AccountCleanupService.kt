@@ -51,11 +51,11 @@ class AccountCleanupService(
         subscriptionRepository.expireAllActiveByUser(userId)  // 자체 트랜잭션 없어 호출자에 합류
         billingKeyRepository.deactivateAll(userId)
 
-        // 상세 이미지만 수거
+        // 상세 이미지 수거
         val deletedProducts = productRepository.softDeleteProductsByCreator(userId)
         val detailImageUrls = deletedProducts.flatMap { extractDetailContentImageUrls(it.detailContent) }
 
-        // 파일만 수거
+        // 파일 수거
         val hiddenMediaUrls = postRepository.findHiddenCreatorPostMediaUrls(userId)
 
         // 게시하지 않은 초안
@@ -85,7 +85,11 @@ class AccountCleanupService(
 
         return AccountCleanupResult(
             deletedProductIds = deletedProducts.map { it.productId },
-            fileUrlsToDelete = detailImageUrls + hiddenMediaUrls + drafts.flatMap { it.fileUrls }
+            fileUrlsToDelete = buildList {
+                addAll(detailImageUrls)
+                addAll(hiddenMediaUrls)
+                drafts.flatMapTo(this) { it.fileUrls }
+            }
         )
     }
 }

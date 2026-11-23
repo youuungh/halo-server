@@ -253,9 +253,8 @@ class ProfileService(
         val postCount = postRepository.countPostsByUserId(userId)
         val isCreator = role == UserRole.CREATOR || role == UserRole.ADMIN
         val subscriberCount = if (isCreator) subscriptionRepository.countCreatorSubscribers(userId) else null
-        val hasSubscriptionPlans = if (isCreator) {
-            subscriptionPlanRepository.countActivePlansByCreator(userId) > 0  // 비활성 플랜만 있으면 구독 시트가 빔
-        } else false
+        val hasSubscriptionPlans =
+            isCreator && subscriptionPlanRepository.countActivePlansByCreator(userId) > 0  // 비활성 플랜만 있으면 구독 시트가 빔
         return ProfileStats(followerCount, followingCount, postCount, subscriberCount, hasSubscriptionPlans)
     }
 }

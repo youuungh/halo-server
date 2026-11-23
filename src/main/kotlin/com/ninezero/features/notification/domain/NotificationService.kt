@@ -74,7 +74,8 @@ class NotificationService(
         val deepLink: String? = null
     )
 
-    // 알림 생성 공통
+    // ===== 알림 생성 공통 =====
+
     private suspend fun requireSenderInfo(userId: Int): SenderInfo {
         val user = userRepository.findUserById(userId)
             ?: throw NotFoundException(Errors.User.USER_INFO_NOT_FOUND)
@@ -96,6 +97,7 @@ class NotificationService(
 
     private fun allowsPush(preference: NotificationPreferenceDao?, type: NotificationType): Boolean {
         if (preference == null) return true  // 설정 없으면 기본 전송
+
         return when (type.getCategory()) {
             NotificationCategory.SOCIAL -> preference.socialEnabled
             NotificationCategory.CREATOR_ACTIVITY -> preference.creatorActivityEnabled
@@ -174,7 +176,8 @@ class NotificationService(
         return response
     }
 
-    // 소셜 알림
+    // ===== 소셜 알림 =====
+
     suspend fun sendFollowNotification(followerId: Int, followedId: Int): NotificationResponse {
         return createAndSendNotification {
             val follower = requireSenderInfo(followerId)
@@ -199,9 +202,7 @@ class NotificationService(
         likerId: Int,
         postId: Int
     ): NotificationResponse? {
-        if (postOwnerId == likerId) {
-            return null  // 자신의 포스트는 알림 스킵
-        }
+        if (postOwnerId == likerId) return null  // 자신의 포스트는 알림 스킵
 
         return createAndSendNotification {
             val liker = requireSenderInfo(likerId)
@@ -229,9 +230,7 @@ class NotificationService(
         commentId: Int,
         postId: Int
     ): NotificationResponse? {
-        if (commentOwnerId == likerId) {
-            return null  // 자신의 댓글은 알림 스킵
-        }
+        if (commentOwnerId == likerId) return null  // 자신의 댓글은 알림 스킵
 
         return createAndSendNotification {
             val liker = requireSenderInfo(likerId)
@@ -259,9 +258,7 @@ class NotificationService(
         postId: Int,
         commentId: Int
     ): NotificationResponse? {
-        if (postOwnerId == commenterId) {
-            return null  // 자신의 포스트는 알림 스킵
-        }
+        if (postOwnerId == commenterId) return null  // 자신의 포스트는 알림 스킵
 
         return createAndSendNotification {
             val commenter = requireSenderInfo(commenterId)
@@ -290,9 +287,7 @@ class NotificationService(
         commentId: Int,
         parentCommentId: Int
     ): NotificationResponse? {
-        if (commentOwnerId == replierId) {
-            return null  // 자신의 댓글은 알림 스킵
-        }
+        if (commentOwnerId == replierId) return null  // 자신의 댓글은 알림 스킵
 
         return createAndSendNotification {
             val replier = requireSenderInfo(replierId)
@@ -323,15 +318,13 @@ class NotificationService(
         content: String,
         canViewContent: Boolean
     ): NotificationResponse? {
-        if (mentionedUserId == mentionerId) {
-            return null  // 자기 자신 멘션은 알림 스킵
-        }
+        if (mentionedUserId == mentionerId) return null  // 자기 자신 멘션은 알림 스킵
 
         return createAndSendNotification {
             val mentioner = requireSenderInfo(mentionerId)
 
             val preview = when {
-                !canViewContent -> "댓글에서 회원님을 언급했습니다"  // 잠긴 글 본문은 알림에 싣지 않음
+                !canViewContent -> "댓글에서 회원님을 언급했습니다"  // 잠긴 글 본문은 알림에서 제외
                 content.length > Constants.Social.MENTION_NOTIFICATION_PREVIEW_LENGTH ->
                     content.take(Constants.Social.MENTION_NOTIFICATION_PREVIEW_LENGTH) + "..."  // 초과 시 말줄임
                 else -> content
@@ -354,7 +347,8 @@ class NotificationService(
         }
     }
 
-    // 주문 알림
+    // ===== 주문 알림 =====
+
     suspend fun sendOrderCreatedNotification(
         userId: Int,
         orderId: Int,
@@ -474,7 +468,7 @@ class NotificationService(
         }
     }
 
-    // 배송 알림
+    // ===== 배송 알림 =====
     suspend fun sendShippingStartedNotification(
         userId: Int,
         orderId: Int,
@@ -574,7 +568,8 @@ class NotificationService(
     /** 배송그룹 구분용 판매자명 */
     private suspend fun sellerName(creatorId: Int): String = findSenderInfo(creatorId)?.username ?: "판매자"
 
-    // 채팅 알림
+    // ===== 채팅 알림 =====
+
     /** 채팅은 알림 목록에 쌓지 않고 접속 안 한 수신자에게 푸시만 */
     suspend fun sendChatMessageNotification(
         recipientId: Int,
@@ -609,7 +604,8 @@ class NotificationService(
         )
     }
 
-    // 포인트·크리에이터 알림
+    // ===== 포인트·크리에이터 알림 =====
+
     suspend fun sendPointEarnedNotification(
         userId: Int,
         orderId: Int,
@@ -700,7 +696,8 @@ class NotificationService(
         }
     }
 
-    // 구독
+    // ===== 구독 알림 =====
+
     suspend fun sendNewSubscriberNotification(
         creatorId: Int,
         subscriberId: Int,
@@ -806,7 +803,8 @@ class NotificationService(
         }
     }
 
-    // 팔로워 일괄 알림
+    // ===== 팔로워 일괄 알림 =====
+
     suspend fun sendNewPostNotifications(
         creatorId: Int,
         creatorUsername: String,
@@ -904,7 +902,7 @@ class NotificationService(
         }
     }
 
-    // 읽음 처리/삭제
+    // 읽음 처리·삭제
     suspend fun markAsReadByTarget(userId: Int, type: NotificationType, targetId: Int) {
         query { notificationRepository.markAsReadByTarget(userId, type, targetId) }  // 대상 없으면 조용히 무시
     }
@@ -940,7 +938,8 @@ class NotificationService(
         notificationRepository.deactivateByTarget(NotificationType.NEW_POST, NotificationTargetType.POST, postId)
     }
 
-    // 알림 설정
+    // ===== 알림 설정 =====
+
     suspend fun getPreferences(userId: Int): NotificationPreferenceResponse {
         return query {
             preferenceRepository.findByUserId(userId)?.toNotificationPreferenceResponse() ?: defaultPreferenceResponse()
@@ -976,7 +975,8 @@ class NotificationService(
         }
     }
 
-    // 일괄 발송·FCM 폴백
+    // ===== 일괄 발송·FCM 폴백 =====
+
     private suspend fun sendBatchCreatorNotifications(
         recipientIds: List<Int>,
         senderId: Int,
@@ -1159,7 +1159,8 @@ class NotificationService(
         }
     }
 
-    // 공통 보조
+    // ===== 공통 보조 =====
+
     private suspend fun getPostImageUrl(postId: Int): String? {
         val post = postRepository.findPostById(postId) ?: return null
         // 잠금 글 이미지는 알림에서 제외
