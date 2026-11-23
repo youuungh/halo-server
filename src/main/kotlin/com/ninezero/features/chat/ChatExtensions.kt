@@ -68,7 +68,7 @@ fun MessageDao.toMessageResponse(
     postMediaItems: List<MediaItemResponse>? = null,
     postHidden: Boolean = false
 ): MessageResponse {
-    // 삭제 메시지는 본문/미디어 비우고 메타만 반환
+    // 삭제 메시지는 본문·미디어 비우고 메타만 반환
     if (isDeleted) {
         return MessageResponse(
             id = id.value,
@@ -80,7 +80,8 @@ fun MessageDao.toMessageResponse(
             readAt = readAt,
             createdAt = createdAt,
             isFromMe = senderId == currentUserId,
-            isDeleted = true
+            isDeleted = true,
+            clientTempId = clientTempId.takeIf { senderId == currentUserId }
         )
     }
 
@@ -168,7 +169,8 @@ fun MessageDao.toMessageResponse(
         isRead = isRead,
         readAt = readAt,
         createdAt = createdAt,
-        isFromMe = senderId == currentUserId
+        isFromMe = senderId == currentUserId,
+        clientTempId = clientTempId.takeIf { senderId == currentUserId }
     )
 }
 

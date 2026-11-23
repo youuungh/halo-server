@@ -45,6 +45,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -131,6 +132,7 @@ class MessageServiceTest {
                 webSocketManager = webSocketManager,
                 fileUploadService = fileUploadService,
                 imageProcessingService = imageProcessingService,
+                videoProcessingService = mockk(relaxed = true),
                 mediaUploadService = mediaUploadService,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
@@ -214,6 +216,26 @@ class MessageServiceTest {
             val second = messageService.sendMessage(chatRoom.id.value, user1.id.value, request)
 
             assertTrue(first.id != second.id)
+        }
+    }
+
+    @Test
+    fun `clientTempId는 보낸 사람 응답에만 돌려준다`() {
+        runBlocking {
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = query { chatRepository.getOrCreateChatRoom(user1.id.value, user2.id.value) }
+
+            val sent = messageService.sendMessage(
+                chatRoom.id.value, user1.id.value,
+                SendMessageRequest(content = "안녕하세요", chatMessageType = ChatMessageType.TEXT, clientTempId = "temp-1")
+            )
+            val senderView = messageService.getMessages(chatRoom.id.value, user1.id.value, 10).messages.single()
+            val receiverView = messageService.getMessages(chatRoom.id.value, user2.id.value, 10).messages.single()
+
+            assertEquals("temp-1", sent.clientTempId)
+            assertEquals("temp-1", senderView.clientTempId)
+            assertNull(receiverView.clientTempId)
         }
     }
 

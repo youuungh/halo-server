@@ -27,7 +27,8 @@ data class MessageResponse(
     val readAt: LocalDateTime? = null,
     val createdAt: LocalDateTime,
     val isFromMe: Boolean,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val clientTempId: String? = null
 )
 
 typealias SearchMessageListResponse = PaginatedResponse<MessageResponse>

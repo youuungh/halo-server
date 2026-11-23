@@ -16,6 +16,7 @@ import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.StorageConfig
 import com.ninezero.core.storage.StoragePaths
+import com.ninezero.core.storage.VideoProcessingService
 import com.ninezero.core.websocket.RealtimeFrame
 import com.ninezero.core.websocket.RealtimeFrameType
 import com.ninezero.core.websocket.WebSocketManager
@@ -38,6 +39,7 @@ import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.data.PostRepository
 import com.ninezero.features.social.domain.PostService
 import com.ninezero.features.upload.domain.MediaUploadService
+import com.ninezero.features.upload.domain.optimizeUploadedVideo
 import com.ninezero.features.upload.presentation.models.response.UploadPrepareResponse
 import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
@@ -60,6 +62,7 @@ class MessageService(
     private val webSocketManager: WebSocketManager,
     private val fileUploadService: FileUploadService,
     private val imageProcessingService: ImageProcessingService,
+    private val videoProcessingService: VideoProcessingService,
     private val coroutineScope: CoroutineScope
 ) {
     private val logger = logger()
@@ -91,10 +94,17 @@ class MessageService(
         if (request.chatMessageType == ChatMessageType.IMAGE && request.mediaAttachments.isNullOrEmpty()) {
             throw InvalidInputException(Errors.File.NO_IMAGE_FILES)
         }
-        ValidationUtils.validateChatMessage(request.content, request.mediaAttachments.orEmpty().size + (if (uploadId != null) 1 else 0))
+        ValidationUtils.validateChatMessage(
+            request.content,
+            request.mediaAttachments.orEmpty().size + (if (uploadId != null) 1 else 0)
+        )
 
         // 이 방에 본인이 올린 사진만 첨부 가능
-        val attachedUrls = request.mediaAttachments.orEmpty() + request.mediaThumbnails.orEmpty() + listOfNotNull(request.thumbnailUrl)
+        val attachedUrls = buildList {
+            addAll(request.mediaAttachments.orEmpty())
+            addAll(request.mediaThumbnails.orEmpty())
+            addAll(listOfNotNull(request.thumbnailUrl))
+        }
         if (attachedUrls.any { !isOwnChatImage(it, roomId, currentUserId) }) {
             throw InvalidInputException(Errors.File.FILE_NOT_OWNED)
         }
@@ -109,10 +119,17 @@ class MessageService(
             null
         }
 
+        // 영상 위치 정보 제거
+        if (uploadPurpose == UploadPurpose.CHAT_VIDEO && verifiedUpload != null) {
+            runCatching { optimizeUploadedVideo(videoProcessingService, fileUploadService, verifiedUpload) }
+                .onFailure { logger.warn("채팅 영상 정리 실패: {}", it.message) }
+        }
+
         val messagePreview = createMessagePreview(request.content, request.chatMessageType, request.mediaAttachments)
 
         val (response, receiverId, isResend) = query {
-            val room = requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
+            val room =
+                requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
 
             val receiver = if (room.user1Id == currentUserId) room.user2Id else room.user1Id
             if (blockedUserRepository.isBlockedEither(currentUserId, receiver)) {
@@ -165,7 +182,15 @@ class MessageService(
         if (isResend) return response
 
         // 수신자 관점으로 보정
-        webSocketManager.sendToUser(receiverId, DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE, response.copy(isFromMe = false))))
+        webSocketManager.sendToUser(
+            receiverId,
+            DefaultJson.encodeToString(
+                RealtimeFrame(
+                    RealtimeFrameType.MESSAGE,
+                    response.copy(isFromMe = false, clientTempId = null)
+                )
+            )
+        )
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
@@ -186,7 +211,10 @@ class MessageService(
             buildMessageResponses(messageIds.mapNotNull { messageRepository.findMessageById(it) }, receiverId)
         }
         responses.forEach { response ->
-            webSocketManager.sendToUser(receiverId, DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE, response)))
+            webSocketManager.sendToUser(
+                receiverId,
+                DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE, response))
+            )
         }
     }
 
@@ -255,7 +283,8 @@ class MessageService(
         }
 
         val (lastReadMessageId, messageResponses) = query {
-            val room = requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
+            val room =
+                requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
 
             val lastRead = when (currentUserId) {
                 room.user1Id -> room.user1LastReadMessageId
@@ -269,7 +298,8 @@ class MessageService(
                 else -> null
             }
 
-            val messageList = messageRepository.findMessagesByRoomId(roomId, validLimit, beforeMessageId, clearedAt)  // 클리어 시점 이후만 조회
+            val messageList =
+                messageRepository.findMessagesByRoomId(roomId, validLimit, beforeMessageId, clearedAt)  // 클리어 시점 이후만 조회
             lastRead to buildMessageResponses(messageList, currentUserId)
         }
 
@@ -301,8 +331,17 @@ class MessageService(
                 readerId = currentUserId,
                 readAt = nowUtc()
             )
-            if (webSocketManager.sendToUser(readInfo.senderId, DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE_READ, readEvent)))) {
-                logger.debug("읽음 이벤트 전송: senderId={}, messageCount={}, roomId={}", readInfo.senderId, readInfo.messageIds.size, roomId)
+            if (webSocketManager.sendToUser(
+                    readInfo.senderId,
+                    DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE_READ, readEvent))
+                )
+            ) {
+                logger.debug(
+                    "읽음 이벤트 전송: senderId={}, messageCount={}, roomId={}",
+                    readInfo.senderId,
+                    readInfo.messageIds.size,
+                    roomId
+                )
             }
         }
 
@@ -326,7 +365,12 @@ class MessageService(
             messageRepository.deleteMessage(messageId)
 
             // 마지막 메시지면 프리뷰 갱신
-            val room = requireChatRoomParticipant(chatRepository, message.roomId, currentUserId, Errors.Chat.MESSAGE_DELETE_PERMISSION_DENIED)
+            val room = requireChatRoomParticipant(
+                chatRepository,
+                message.roomId,
+                currentUserId,
+                Errors.Chat.MESSAGE_DELETE_PERMISSION_DENIED
+            )
             if (room.lastMessageId == messageId) {
                 room.lastMessagePreview = "삭제된 메시지"
             }
@@ -339,16 +383,22 @@ class MessageService(
             }
 
             // 이 방에 본인이 올린 파일만 삭제 대상
-            val ownFileUrls = (message.mediaAttachments.decodeToMediaAttachments() +
-                message.mediaThumbnails.decodeToMediaAttachments() +
-                listOfNotNull(message.thumbnailUrl))
+            val ownFileUrls = buildList {
+                addAll(message.mediaAttachments.decodeToMediaAttachments())
+                addAll(message.mediaThumbnails.decodeToMediaAttachments())
+                addAll(listOfNotNull(message.thumbnailUrl))
+            }
                 .filter { isOwnChatFile(it, message.roomId, message.senderId) }
 
             Triple(ownFileUrls, message.roomId, receiver)
         } ?: return
 
         val deletedEvent = MessageDeletedEvent(roomId = roomId, messageId = messageId)
-        if (webSocketManager.sendToUser(receiverId, DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE_DELETED, deletedEvent)))) {
+        if (webSocketManager.sendToUser(
+                receiverId,
+                DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE_DELETED, deletedEvent))
+            )
+        ) {
             logger.debug("삭제 이벤트 전송: receiverId={}, messageId={}, roomId={}", receiverId, messageId, roomId)
         }
 
@@ -368,7 +418,8 @@ class MessageService(
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
         return query {
-            val room = requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
+            val room =
+                requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
 
             val clearedAt = when (currentUserId) {
                 room.user1Id -> room.user1ClearedAt
@@ -386,20 +437,21 @@ class MessageService(
         }
     }
 
-    // 공통 보조
+    // ===== 공통 보조 =====
+
     /** 보낸 사람이 이 방에 올린 채팅 사진 판정 */
     private fun isOwnChatImage(url: String, roomId: Int, senderId: Int): Boolean {
         val room = "chats/$roomId/"
         return StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_IMAGES, "${room}chat_${senderId}_") ||
-            StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_IMAGES, "${room}chat_thumb_${senderId}_")
+                StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_IMAGES, "${room}chat_thumb_${senderId}_")
     }
 
     /** 보낸 사람이 이 방에 올린 채팅 파일 판정 */
     private fun isOwnChatFile(url: String, roomId: Int, senderId: Int): Boolean {
         val room = "chats/$roomId/"
         return isOwnChatImage(url, roomId, senderId) ||
-            StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_VIDEOS, "${room}videos/chat_video_${senderId}_") ||
-            StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_FILES, "${room}files/chat_file_${senderId}_")
+                StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_VIDEOS, "${room}videos/chat_video_${senderId}_") ||
+                StoragePaths.isOwned(url, StorageConfig.Buckets.CHAT_FILES, "${room}files/chat_file_${senderId}_")
     }
 
     private suspend fun buildMessageResponses(
@@ -425,7 +477,7 @@ class MessageService(
             postRepository.findPostsByIds(postIds)
                 .associateBy { it.id.value }
         } else emptyMap()
-        // HIDDEN 글 구분
+
         val missingPostIds = postIds - postMap.keys
         val hiddenPostIds = if (missingPostIds.isNotEmpty()) {
             postRepository.findPostsByIdsWithDeleted(missingPostIds)

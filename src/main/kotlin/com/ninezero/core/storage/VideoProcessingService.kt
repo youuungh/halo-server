@@ -87,7 +87,8 @@ class VideoProcessingService {
                 "-y",
                 "-i", video.absolutePath,
                 "-c", "copy",  // 재인코딩 없음
-                "-movflags", "+faststart",  // moov 후미면 seek 불가
+                "-map_metadata", "-1",  // 촬영 위치 등 메타데이터 제거
+                "-movflags", "+faststart",  // moov 뒤에 있으면 재생·탐색 늦음
                 out.absolutePath
             ).runQuietly()
 
@@ -114,6 +115,7 @@ class VideoProcessingService {
                 "ffmpeg",
                 "-y",
                 "-i", video.absolutePath,
+                "-map_metadata", "-1",
                 "-vf",
                 "scale=w='min(1080,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease," +
                     "scale=trunc(iw/2)*2:trunc(ih/2)*2",

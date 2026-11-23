@@ -52,3 +52,17 @@ internal suspend fun prepareUploadedVideo(
         source.delete()  // 재인코딩은 게시 후 저장소에서 다시 받음
     }
 }
+
+/** 직접 업로드 영상 스트리밍 재정렬만 */
+internal suspend fun optimizeUploadedVideo(
+    videoProcessingService: VideoProcessingService,
+    fileUploadService: FileUploadService,
+    upload: MediaUploadService.VerifiedUpload
+) {
+    val source = fileUploadService.downloadToTempFile(upload.bucket, upload.path, upload.size)
+    try {
+        videoProcessingService.optimizeForStreaming(source)?.let { fileUploadService.reuploadToUrl(upload.url, it) }
+    } finally {
+        source.delete()
+    }
+}
