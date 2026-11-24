@@ -19,6 +19,7 @@ import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.dao.with
 
 class ReviewRepositoryImpl : ReviewRepository {
 
@@ -130,7 +131,7 @@ class ReviewRepositoryImpl : ReviewRepository {
         if (reviews.isEmpty()) return emptyList()
 
         val userIds = reviews.map { it.userId }.distinct()
-        val users = UserDao.find { UserTable.id inList userIds }.associateBy { it.id.value }
+        val users = UserDao.find { UserTable.id inList userIds }.with(UserDao::profile).associateBy { it.id.value }
 
         return reviews.mapNotNull { review ->
             val author = users[review.userId] ?: return@mapNotNull null  // 작성자 없으면 제외

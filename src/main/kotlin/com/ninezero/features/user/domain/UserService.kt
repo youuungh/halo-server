@@ -27,7 +27,7 @@ class UserService(
         limit: Int = Constants.DEFAULT_PAGE_LIMIT,
         currentUserId: Int? = null
     ): UserListResponse {
-        ValidationUtils.validateSearchQuery(query)
+        UserValidation.validateSearchQuery(query)
 
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
@@ -66,7 +66,7 @@ class UserService(
     ): UserListResponse {
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
-        search?.let { ValidationUtils.validateSearchQuery(it) }
+        search?.let { UserValidation.validateSearchQuery(it) }
         val keyword = search?.trim()
 
         val (userSummaries, totalCount) = query {
@@ -106,8 +106,8 @@ class UserService(
     }
 
     suspend fun checkUsernameAvailability(username: String): UsernameAvailabilityResponse {
-        val normalizedUsername = ValidationUtils.normalizeUsername(username)
-        ValidationUtils.validateUsername(normalizedUsername)  // 가입과 같은 형식 검사
+        val normalizedUsername = UserValidation.normalizeUsername(username)
+        UserValidation.validateUsername(normalizedUsername)  // 가입과 같은 형식 검사
 
         val isAvailable = query {
             !userRepository.existsByUsername(normalizedUsername)

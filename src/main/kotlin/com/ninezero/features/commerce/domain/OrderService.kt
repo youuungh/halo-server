@@ -22,10 +22,11 @@ import com.ninezero.features.commerce.presentation.models.request.UpdateOrderSta
 import com.ninezero.features.commerce.presentation.models.response.*
 import com.ninezero.features.coupon.domain.CouponRedemptionService
 import com.ninezero.features.coupon.domain.CouponValidationResult
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.point.data.PointRepository
 import com.ninezero.features.point.domain.PointService
-import com.ninezero.features.subscription.data.SubscriptionPlanRepository
+import com.ninezero.features.point.domain.PointValidation
+import com.ninezero.features.point.domain.pointAmountError
 import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.data.UserRepository
 import kotlinx.coroutines.CoroutineScope
@@ -44,8 +45,7 @@ class OrderService(
     private val paymentRepository: PaymentRepository,
     private val pointRepository: PointRepository,
     private val subscriptionRepository: SubscriptionRepository,
-    private val subscriptionPlanRepository: SubscriptionPlanRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val pointService: PointService,
     private val couponRedemptionService: CouponRedemptionService,
     private val cartService: CartService,
@@ -79,16 +79,16 @@ class OrderService(
         val amount: BigDecimal
     )
 
-    // 미결제 주문 정리
+    /** 미결제 주문 정리 */
     suspend fun reconcileStalePendingOrders(olderThanMinutes: Long = 30): Int {
         val before = (Clock.System.now() - olderThanMinutes.minutes).toLocalDateTime(TimeZone.UTC)
 
         val refs = query {
-            paymentRepository.findStalePendingPaymentOrderIds(before).mapNotNull { oid ->
-                val order = orderRepository.findOrderById(oid) ?: return@mapNotNull null
-                val payment = paymentRepository.findByOrderId(oid) ?: return@mapNotNull null
+            paymentRepository.findStalePendingPaymentOrderIds(before).mapNotNull { orderId ->
+                val order = orderRepository.findOrderById(orderId) ?: return@mapNotNull null
+                val payment = paymentRepository.findByOrderId(orderId) ?: return@mapNotNull null
                 StalePendingPaymentRef(
-                    orderId = oid,
+                    orderId = orderId,
                     orderNumber = order.orderNumber,
                     buyerUserId = order.userId,
                     provider = payment.provider,
@@ -165,26 +165,27 @@ class OrderService(
         true
     }
 
-    // 환불
-    private suspend fun executeTossRefundOrThrow(ctx: CancelRefundContext): Boolean {
-        if (!ctx.wasPaid || ctx.refundAmount <= BigDecimal.ZERO) return false
-        if (ctx.provider !in TOSS_PROVIDERS || ctx.paymentKey.isNullOrBlank()) return false  // MOCK 등 제외
+    // =====  환불 =====
+
+    private suspend fun executeTossRefundOrThrow(refundContext: CancelRefundContext): Boolean {
+        if (!refundContext.wasPaid || refundContext.refundAmount <= BigDecimal.ZERO) return false
+        if (refundContext.provider !in TOSS_PROVIDERS || refundContext.paymentKey.isNullOrBlank()) return false  // MOCK 등 제외
 
         val result = tossPaymentClient.cancel(
-            paymentKey = ctx.paymentKey,
+            paymentKey = refundContext.paymentKey,
             cancelReason = TossKeys.CANCEL_REASON,  // 사용자 사유는 로컬에만 기록
-            cancelAmount = ctx.partialCancelAmount,
-            idempotencyKey = ctx.idempotencyKey
+            cancelAmount = refundContext.partialCancelAmount,
+            idempotencyKey = refundContext.idempotencyKey
         )
         if (result is TossCancelResult.Failure) {
             // 토스 전액 취소 뒤 로컬 반영만 실패한 재시도
-            if (ctx.partialCancelAmount == null && isAlreadyFullyCancelled(ctx.paymentKey)) {
-                logger.warn("토스 결제가 이미 전액 취소돼 로컬 취소를 이어서 진행: paymentId={}", ctx.paymentId)
+            if (refundContext.partialCancelAmount == null && isAlreadyFullyCancelled(refundContext.paymentKey)) {
+                logger.warn("토스 결제가 이미 전액 취소돼 로컬 취소를 이어서 진행: paymentId={}", refundContext.paymentId)
                 return true
             }
             logger.error(
                 "토스 결제 취소 실패: paymentId={}, code={}, message={}",
-                ctx.paymentId, result.code, result.message
+                refundContext.paymentId, result.code, result.message
             )
             throw PaymentConfirmFailedException(result.message ?: Errors.Commerce.Payment.TOSS_CONFIRM_FAILED)  // 취소 중단
         }
@@ -201,8 +202,8 @@ class OrderService(
     }
 
     /** 취소 중 결제 완료 시 중단 */
-    private suspend fun requireStillUnpaid(orderId: Int, refundCtx: CancelRefundContext?) {
-        if (refundCtx == null || refundCtx.wasPaid) return  // 주문 잠금 뒤에만 호출
+    private suspend fun requireStillUnpaid(orderId: Int, refundContext: CancelRefundContext?) {
+        if (refundContext == null || refundContext.wasPaid) return  // 주문 잠금 뒤에만 호출
         if (paymentRepository.findByOrderId(orderId)?.status == PaymentStatus.COMPLETED) {
             throw ConflictException(Errors.Commerce.Order.ORDER_PAID_DURING_CANCEL)
         }
@@ -215,7 +216,7 @@ class OrderService(
         cancelReason: String
     ) {
         // 사전 검증, 환불액 계산
-        val refundCtx = query {  // 권한검증·알림은 호출부 책임
+        val refundContext = query {  // 권한검증·알림은 호출부 책임
             val order = orderRepository.findOrderById(orderId)
                 ?: throw OrderNotFoundException(Errors.Commerce.Order.ORDER_NOT_FOUND)
             val (orderItems, products, _) = orderResponseAssembler.fetchOrderItemsWithProducts(orderId)
@@ -249,7 +250,7 @@ class OrderService(
         }
 
         // 환불 먼저, 실패 시 취소 중단
-        if (refundCtx != null) executeTossRefundOrThrow(refundCtx)
+        if (refundContext != null) executeTossRefundOrThrow(refundContext)
 
         // 취소 확정
         query {
@@ -283,17 +284,17 @@ class OrderService(
             shipment.shippingStatus = ShippingStatus.PREPARING
 
             // 환불정보 기록
-            val payment = refundCtx?.let { paymentRepository.findByOrderId(orderId) }
-            if (refundCtx != null) {
+            val payment = refundContext?.let { paymentRepository.findByOrderId(orderId) }
+            if (refundContext != null) {
                 // 마지막 그룹은 잔여 흡수값을 환불액으로 사용
-                shipment.refundAmount = if (refundCtx.partialCancelAmount == null) {
+                shipment.refundAmount = if (refundContext.partialCancelAmount == null) {
                     val priorRefunded = shipmentsBefore
                         .filter { it.status == OrderStatus.CANCELLED }
                         .sumOf { it.refundAmount ?: BigDecimal.ZERO }
-                    val paidAmount = payment?.amount ?: refundCtx.refundAmount
+                    val paidAmount = payment?.amount ?: refundContext.refundAmount
                     (paidAmount - priorRefunded).coerceAtLeast(BigDecimal.ZERO)
                 } else {
-                    refundCtx.refundAmount
+                    refundContext.refundAmount
                 }
                 shipment.refundReason = cancelReason
                 shipment.refundCompletedAt = nowUtc()
@@ -319,13 +320,14 @@ class OrderService(
             }
 
             // 전체 취소 확정 → 결제 전액 REFUNDED
-            if (refundCtx != null && shipmentsAfter.all { it.status == OrderStatus.CANCELLED }) {
+            if (refundContext != null && shipmentsAfter.all { it.status == OrderStatus.CANCELLED }) {
                 payment?.let { recordRefund(it.id.value, cancelReason, it.amount) }
             }
         }
     }
 
-    // 주문 생성
+    // =====  주문 생성 =====
+
     /** 장바구니로 주문 생성 */
     suspend fun createOrderFromCart(userId: Int, request: OrderRequest): OrderResponse {
         val pointsUsed = validateCheckoutFields(request)
@@ -369,7 +371,7 @@ class OrderService(
 
     /** 장바구니를 거치지 않는 바로구매 주문 생성 */
     suspend fun createDirectOrder(userId: Int, request: DirectOrderRequest): OrderResponse {
-        ValidationUtils.validateCartQuantity(request.quantity)
+        CommerceValidation.validateCartQuantity(request.quantity)
         val pointsUsed = validateCheckoutFields(request)
         val orderNumber = generateOrderNumber()
 
@@ -390,14 +392,14 @@ class OrderService(
 
     /** 사용 포인트를 돌려주는 배송 정보 검증 */
     private fun validateCheckoutFields(fields: OrderCheckoutFields): BigDecimal {
-        ValidationUtils.validateShippingAddress(fields.shippingAddress)
-        ValidationUtils.validateShippingPhone(fields.shippingPhone)
-        ValidationUtils.validateShippingName(fields.shippingName)
+        CommerceValidation.validateShippingAddress(fields.shippingAddress)
+        CommerceValidation.validateShippingPhone(fields.shippingPhone)
+        CommerceValidation.validateShippingName(fields.shippingName)
 
         val pointsToUse = fields.pointsToUse
         val pointsUsed = if (!pointsToUse.isNullOrBlank()) BigDecimal(pointsToUse) else BigDecimal.ZERO
         // 음수는 잔액 검증을 건너뛰고 결제액을 늘리므로 차단
-        ValidationUtils.validatePointAmount(pointsUsed)
+        PointValidation.validatePointAmount(pointsUsed)
         return pointsUsed
     }
 
@@ -433,19 +435,19 @@ class OrderService(
 
             // 타임딜 딜가 청구
             val pricing = product.dealPricingAt()
-            val effPrice = pricing.price
-            val effOriginal = pricing.originalPrice
+            val actualPrice = pricing.price
+            val actualOriginal = pricing.originalPrice
 
-            val itemTotal = effPrice.multiply(BigDecimal(quantity))
+            val itemTotal = actualPrice.multiply(BigDecimal(quantity))
             creatorAmountMap[product.creatorId] = (creatorAmountMap[product.creatorId] ?: BigDecimal.ZERO).add(itemTotal)
 
-            val originalPrice = effOriginal?.takeIf { it != effPrice }
+            val originalPrice = actualOriginal?.takeIf { it != actualPrice }
 
             orderItems.add(
                 OrderItemData(
                     productId = product.id.value,
                     quantity = quantity,
-                    price = effPrice,
+                    price = actualPrice,
                     originalPrice = originalPrice
                 )
             )
@@ -454,12 +456,7 @@ class OrderService(
         }
 
         val creatorIds = creatorIdSet.toList()
-        val subscriptions = subscriptionRepository.findActiveSubscriptionsByCreators(userId, creatorIds)
-        val plans = subscriptionPlanRepository.findPlansByIds(subscriptions.map { it.planId }.distinct())
-            .associateBy { it.id.value }
-        val creatorTierMap = subscriptions.associate { sub ->
-            sub.creatorId to (plans[sub.planId]?.tier ?: SubscriptionPlanTier.FREE)
-        }
+        val creatorTierMap = subscriptionRepository.findActiveTiersByCreators(userId, creatorIds)
 
         // 크리에이터별 배송비, 구독 티어는 무료
         val shippingFeeByCreator = mutableMapOf<Int, BigDecimal>()
@@ -611,7 +608,8 @@ class OrderService(
         }
     }
 
-    // 결제 완료 후 처리
+    // =====  결제 완료 후 처리 =====
+
     /** 결제 확정된 장바구니 주문의 상품 비우기 */
     suspend fun clearOrderedCartItemsInTransaction(orderId: Int, userId: Int) {
         if (orderRepository.findOrderById(orderId)?.orderSource != OrderSource.CART) return
@@ -634,14 +632,14 @@ class OrderService(
                     order to orderRepository.findOrderShipments(orderId).map { it.creatorId }.distinct()
                 } ?: return@launch
 
-                notificationService.sendOrderCreatedNotification(
+                notificationSender.sendOrderCreatedNotification(
                     userId = order.userId,
                     orderId = orderId,
                     orderNumber = order.orderNumber
                 )
 
                 for (creatorId in creatorIds) {
-                    notificationService.sendOrderReceivedNotification(
+                    notificationSender.sendOrderReceivedNotification(
                         creatorId = creatorId,
                         buyerId = order.userId,
                         orderId = orderId,
@@ -654,7 +652,8 @@ class OrderService(
         }
     }
 
-    // 주문 조회
+    // =====  주문 조회 =====
+
     suspend fun getOrderById(orderId: Int, userId: Int): OrderResponse {
         return query {
             val order = requireOwnedOrder(orderRepository, orderId, userId, Errors.Commerce.Order.ORDER_VIEW_PERMISSION_DENIED)
@@ -682,11 +681,12 @@ class OrderService(
         }
     }
 
-    // 주문 취소
+    // =====  주문 취소 =====
+
     /** 결제된 주문은 전액 환불 뒤 확정하는 전체 취소 */
     suspend fun cancelOrder(orderId: Int, userId: Int, cancelReason: String = "구매자 요청"): OrderResponse {
         // 사전 검증 + 환불 컨텍스트 캡처
-        val refundCtx = query {
+        val refundContext = query {
             requireOwnedOrder(orderRepository, orderId, userId, Errors.Commerce.Order.ORDER_CANCEL_PERMISSION_DENIED)
 
             if (orderRepository.findOrderShipments(orderId).any { !it.isCancellableGroup() }) {
@@ -707,7 +707,7 @@ class OrderService(
         }
 
         // 환불 먼저, 실패 시 취소 중단
-        val tossRefunded = refundCtx != null && executeTossRefundOrThrow(refundCtx)
+        val tossRefunded = refundContext != null && executeTossRefundOrThrow(refundContext)
 
         // 취소 확정
         val (response, creatorIds) = query {
@@ -729,15 +729,15 @@ class OrderService(
             } else if (lockedShipments.any { !it.isCancellableGroup() }) {
                 throw OrderCancelNotAllowedException(Errors.Commerce.Order.ORDER_CANCEL_NOT_ALLOWED)
             }
-            requireStillUnpaid(orderId, refundCtx)
+            requireStillUnpaid(orderId, refundContext)
 
             orderRepository.cancelOrder(orderId)
             mergeOrderState(lockedOrder, orderRepository.findOrderShipments(orderId))
 
             val payment = paymentRepository.findByOrderId(orderId)
             if (payment != null) {
-                if (refundCtx != null && refundCtx.wasPaid) {
-                    recordRefund(payment.id.value, cancelReason, refundCtx.refundAmount)
+                if (refundContext != null && refundContext.wasPaid) {
+                    recordRefund(payment.id.value, cancelReason, refundContext.refundAmount)
                 } else {
                     paymentRepository.updateStatus(payment.id.value, PaymentStatus.CANCELLED)
                 }
@@ -760,11 +760,11 @@ class OrderService(
         }
 
         // 미결제 취소는 판매자에게 알리지 않음
-        if (refundCtx?.wasPaid == true) {
+        if (refundContext?.wasPaid == true) {
             coroutineScope.launch {  // 커밋 후 알림 발송
                 try {
                     for (creatorId in creatorIds) {
-                        notificationService.sendOrderCancelledNotification(
+                        notificationSender.sendOrderCancelledNotification(
                             recipientId = creatorId,
                             cancelledById = userId,
                             orderId = orderId,
@@ -795,7 +795,7 @@ class OrderService(
 
         coroutineScope.launch {
             try {
-                notificationService.sendOrderCancelledNotification(
+                notificationSender.sendOrderCancelledNotification(
                     recipientId = creatorId,
                     cancelledById = userId,
                     orderId = orderId,
@@ -820,7 +820,8 @@ class OrderService(
             shippingStatus == ShippingStatus.PREPARING
     }
 
-    // 판매자 주문 처리
+    // =====  판매자 주문 처리 =====
+
     suspend fun getCreatorOrders(
         creatorId: Int,
         cursor: String? = null,
@@ -883,10 +884,10 @@ class OrderService(
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
                 when (request.status) {
-                    OrderStatus.CONFIRMED -> notificationService.sendOrderConfirmedNotification(
+                    OrderStatus.CONFIRMED -> notificationSender.sendOrderConfirmedNotification(
                         userId = buyerUserId, creatorId = creatorId, orderId = orderId
                     )
-                    OrderStatus.CANCELLED -> notificationService.sendOrderCancelledNotification(
+                    OrderStatus.CANCELLED -> notificationSender.sendOrderCancelledNotification(
                         recipientId = buyerUserId, cancelledById = creatorId, orderId = orderId
                     )
                 }

@@ -1,7 +1,6 @@
 package com.ninezero.features.point.domain
 
 import com.ninezero.core.common.config.SubscriptionPlanTier
-import com.ninezero.core.common.util.calcEarnByTier
 import java.math.BigDecimal
 
 class PointEarnService(

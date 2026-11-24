@@ -6,6 +6,7 @@ import com.ninezero.core.fcm.FcmService
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
 import com.ninezero.features.notification.data.NotificationPreferenceRepositoryImpl
 import com.ninezero.features.notification.data.NotificationRepositoryImpl
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.notification.domain.NotificationService
 import com.ninezero.core.websocket.WebSocketManager
 import com.ninezero.features.social.data.PostRepositoryImpl
@@ -29,6 +30,7 @@ import kotlin.test.assertNull
 class NotificationServiceTest {
 
     private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var notificationRepository: NotificationRepositoryImpl
     private lateinit var userRepository: UserRepositoryImpl
     private lateinit var webSocketManager: WebSocketManager
@@ -55,6 +57,12 @@ class NotificationServiceTest {
             coEvery { webSocketManager.isUserConnected(any()) } returns false
 
             notificationService = NotificationService(
+                notificationRepository = notificationRepository,
+                userRepository = userRepository,
+                preferenceRepository = preferenceRepository
+            )
+
+            notificationSender = NotificationSender(
                 notificationRepository = notificationRepository,
                 userRepository = userRepository,
                 webSocketManager = webSocketManager,
@@ -87,7 +95,7 @@ class NotificationServiceTest {
         runBlocking {
             val user = TestFixtures.createTestUser()
 
-            val notification = notificationService.sendLikePostNotification(
+            val notification = notificationSender.sendLikePostNotification(
                 postOwnerId = user.id.value,
                 likerId = user.id.value,
                 postId = 1
@@ -104,8 +112,8 @@ class NotificationServiceTest {
             val creatorA = TestFixtures.createTestCreator(email = "a@example.com", username = "creatora")
             val creatorB = TestFixtures.createTestCreator(email = "b@example.com", username = "creatorb")
 
-            val first = notificationService.sendShippingDeliveredNotification(buyer.id.value, orderId = 1, creatorId = creatorA.id.value)
-            val second = notificationService.sendShippingDeliveredNotification(buyer.id.value, orderId = 1, creatorId = creatorB.id.value)
+            val first = notificationSender.sendShippingDeliveredNotification(buyer.id.value, orderId = 1, creatorId = creatorA.id.value)
+            val second = notificationSender.sendShippingDeliveredNotification(buyer.id.value, orderId = 1, creatorId = creatorB.id.value)
 
             assertNotEquals(first.id, second.id)
         }
@@ -116,8 +124,8 @@ class NotificationServiceTest {
         runBlocking {
             val buyer = TestFixtures.createTestUser()
 
-            val first = notificationService.sendPointEarnedNotification(buyer.id.value, orderId = 1, amount = BigDecimal("500"))
-            val second = notificationService.sendPointEarnedNotification(buyer.id.value, orderId = 2, amount = BigDecimal("500"))
+            val first = notificationSender.sendPointEarnedNotification(buyer.id.value, orderId = 1, amount = BigDecimal("500"))
+            val second = notificationSender.sendPointEarnedNotification(buyer.id.value, orderId = 2, amount = BigDecimal("500"))
 
             assertNotEquals(first.id, second.id)
         }
@@ -127,7 +135,7 @@ class NotificationServiceTest {
     fun `같은 대상 알림은 문구가 달라야 새로 쌓인다`() {
         runBlocking {
             val user = TestFixtures.createTestUser()
-            suspend fun renewalNotice(nextBillingDate: LocalDate) = notificationService.sendSubscriptionRenewedNotification(
+            suspend fun renewalNotice(nextBillingDate: LocalDate) = notificationSender.sendSubscriptionRenewedNotification(
                 userId = user.id.value,
                 subscriptionId = 1,
                 creatorUsername = "creator",
@@ -154,7 +162,7 @@ class NotificationServiceTest {
             val recipient = TestFixtures.createTestUser(email = "recipient@example.com", username = "recipient")
             query { userRepository.registerDeviceToken(recipient.id.value, "device-1", "fid-1") }
 
-            notificationService.sendChatMessageNotification(
+            notificationSender.sendChatMessageNotification(
                 recipientId = recipient.id.value,
                 senderId = sender.id.value,
                 roomId = 7,
@@ -175,7 +183,7 @@ class NotificationServiceTest {
             val creator = TestFixtures.createTestCreator()
             val follower = TestFixtures.createTestUser()
             val post = TestFixtures.createTestPost(userId = creator.id.value, creatorId = creator.id.value)
-            notificationService.sendNewPostNotifications(
+            notificationSender.sendNewPostNotifications(
                 creatorId = creator.id.value,
                 creatorUsername = "creator",
                 postId = post.id.value,
@@ -183,7 +191,7 @@ class NotificationServiceTest {
             )
             assertEquals(1, notificationService.getUnreadCount(follower.id.value).count)
 
-            val deactivated = notificationService.deactivateNewPostNotifications(post.id.value)
+            val deactivated = notificationSender.deactivateNewPostNotifications(post.id.value)
 
             assertEquals(1, deactivated)
             assertEquals(0, notificationService.getUnreadCount(follower.id.value).count)
@@ -196,7 +204,7 @@ class NotificationServiceTest {
             val user = TestFixtures.createTestUser()
             val follower = TestFixtures.createTestUser(email = "f@example.com", username = "f")
 
-            val notification = notificationService.sendFollowNotification(follower.id.value, user.id.value)
+            val notification = notificationSender.sendFollowNotification(follower.id.value, user.id.value)
 
             notificationService.markAsRead(notification.id, user.id.value)
 
@@ -212,7 +220,7 @@ class NotificationServiceTest {
             val user2 = TestFixtures.createTestUser(email = "u2@example.com", username = "u2")
             val follower = TestFixtures.createTestUser(email = "f@example.com", username = "f")
 
-            val notification = notificationService.sendFollowNotification(follower.id.value, user1.id.value)
+            val notification = notificationSender.sendFollowNotification(follower.id.value, user1.id.value)
 
             assertFailsWith<NotFoundException> {
                 notificationService.markAsRead(notification.id, user2.id.value)
@@ -227,8 +235,8 @@ class NotificationServiceTest {
             val follower1 = TestFixtures.createTestUser(email = "f1@example.com", username = "f1")
             val follower2 = TestFixtures.createTestUser(email = "f2@example.com", username = "f2")
 
-            notificationService.sendFollowNotification(follower1.id.value, user.id.value)
-            notificationService.sendFollowNotification(follower2.id.value, user.id.value)
+            notificationSender.sendFollowNotification(follower1.id.value, user.id.value)
+            notificationSender.sendFollowNotification(follower2.id.value, user.id.value)
 
             notificationService.markAllAsRead(user.id.value)
 
@@ -255,7 +263,7 @@ class NotificationServiceTest {
             val user = TestFixtures.createTestUser()
             val follower = TestFixtures.createTestUser(email = "f@example.com", username = "f")
 
-            val notification = notificationService.sendFollowNotification(follower.id.value, user.id.value)
+            val notification = notificationSender.sendFollowNotification(follower.id.value, user.id.value)
 
             notificationService.deleteNotification(notification.id, user.id.value)
 

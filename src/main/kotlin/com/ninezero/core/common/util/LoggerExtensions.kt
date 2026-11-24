@@ -1,0 +1,12 @@
+package com.ninezero.core.common.util
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
+inline fun <reified T : Any> T.logger(): Logger {
+    return LoggerFactory.getLogger(T::class.java)
+}
+
+fun logger(name: String): Logger {
+    return LoggerFactory.getLogger(name)
+}

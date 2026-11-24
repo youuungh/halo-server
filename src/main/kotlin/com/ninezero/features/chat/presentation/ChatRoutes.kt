@@ -3,6 +3,7 @@ package com.ninezero.features.chat.presentation
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.NotFoundException
 import com.ninezero.core.common.util.*
 import com.ninezero.features.chat.domain.ChatService
 import com.ninezero.features.chat.presentation.models.request.CreateChatRoomRequest
@@ -57,14 +58,7 @@ fun Route.chatRoutes() {
                 summary = "내 채팅방 목록 조회"
                 tags("Chat")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<Boolean>("includeArchived") {
                         description = "보관된 채팅방 포함 여부 (기본값: false)"
                         required = false
@@ -139,14 +133,8 @@ fun Route.chatRoutes() {
                     ?: return@get
 
                 val response = chatService.findChatRoomWithUser(userId, otherUserId)
-                if (response == null) {
-                    call.respond(
-                        HttpStatusCode.NotFound,
-                        ApiResponse.error<Unit>(Errors.Chat.CHAT_ROOM_NOT_FOUND)
-                    )
-                } else {
-                    call.respond(HttpStatusCode.OK, ApiResponse.success(response))
-                }
+                    ?: throw NotFoundException(Errors.Chat.CHAT_ROOM_NOT_FOUND)
+                call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
             put("/{roomId}/archive", {

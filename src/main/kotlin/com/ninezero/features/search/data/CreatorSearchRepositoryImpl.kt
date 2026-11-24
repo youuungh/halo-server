@@ -12,6 +12,7 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.notInList
+import org.jetbrains.exposed.v1.dao.with
 import org.jetbrains.exposed.v1.jdbc.*
 
 class CreatorSearchRepositoryImpl : CreatorSearchRepository {
@@ -42,6 +43,7 @@ class CreatorSearchRepositoryImpl : CreatorSearchRepository {
         return UserDao.find { buildKeywordCondition(keyword, excludeUserIds) }
             .orderBy(UserTable.createdAt to SortOrder.DESC, UserTable.id to SortOrder.DESC)  // 최신 가입순
             .limit(limit).offset(page.toOffset(limit))
+            .with(UserDao::profile)
             .toList()
     }
 
@@ -71,7 +73,7 @@ class CreatorSearchRepositoryImpl : CreatorSearchRepository {
         }
 
         // 필터가 인기 선정 뒤 적용돼 limit 미달 가능
-        return UserDao.find { condition }.sortedBy { orderMap[it.id.value] }  // 팔로우 수 순서 유지
+        return UserDao.find { condition }.with(UserDao::profile).sortedBy { orderMap[it.id.value] }  // 팔로우 수 순서 유지
     }
 
     /** 크리에이터 검색 결과 수 */

@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ChatUploadPrepareRequest(
-    // VIDEO 또는 FILE
     val messageType: ChatMessageType,
     val mimeType: String,
     val size: Long,

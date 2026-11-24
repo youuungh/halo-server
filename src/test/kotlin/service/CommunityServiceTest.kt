@@ -13,7 +13,7 @@ import com.ninezero.core.database.entities.upload.MediaDraftDao
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.VideoProcessingService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.*
 import com.ninezero.features.social.domain.CommunityService
 import com.ninezero.features.social.domain.PostMediaService
@@ -99,7 +99,7 @@ class CommunityServiceTest {
                 subscriptionRepository = SubscriptionRepositoryImpl(),
                 planRepository = SubscriptionPlanRepositoryImpl(),
                 blockedUserRepository = BlockedUserRepositoryImpl(),
-                notificationService = mockk<NotificationService>(relaxed = true),
+                notificationSender = mockk<NotificationSender>(relaxed = true),
                 mediaDraftService = mediaDraftService,
                 fileUploadService = fileUploadService,
                 videoProcessingService = mockk(relaxed = true),

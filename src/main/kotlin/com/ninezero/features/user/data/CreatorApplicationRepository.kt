@@ -26,7 +26,7 @@ interface CreatorApplicationRepository {
         sortOrder: String? = null
     ): List<CreatorApplicationDao>
 
-    // 신청 승인/거절
+    // 신청 승인·거절
     suspend fun approveApplication(applicationId: Int, adminId: Int): Int
     suspend fun rejectApplication(applicationId: Int, adminId: Int, rejectionReason: String): Int
 

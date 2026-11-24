@@ -67,14 +67,7 @@ fun Route.bookmarkRoutes() {
                         description = "필터링할 타입 (POST, COMMENT). 미지정 시 전체 조회"
                         required = false
                     }
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
             }) {

@@ -113,14 +113,7 @@ fun Route.couponRoutes() {
                 summary = "내가 만든 쿠폰 목록 조회 (Creator)"
                 tags("Coupons")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
             }) {
@@ -265,14 +258,7 @@ fun Route.couponRoutes() {
                 summary = "내 쿠폰 목록 조회"
                 tags("Coupons")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("status") {
                         description = "쿠폰 상태 필터 (AVAILABLE/USED/EXPIRED, 미지정 시 전체)"
                         required = false

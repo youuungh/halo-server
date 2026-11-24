@@ -4,7 +4,7 @@ import com.ninezero.core.database.entities.search.SearchHistoryDao
 
 interface SearchHistoryRepository {
 
-    // 검색 기록 생성/삭제
+    // 검색 기록 생성·삭제
     suspend fun createHistory(
         userId: Int,
         keyword: String,

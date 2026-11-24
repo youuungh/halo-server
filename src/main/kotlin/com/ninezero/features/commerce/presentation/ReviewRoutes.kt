@@ -4,9 +4,11 @@ import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.config.ReviewSortType
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.UnsupportedMediaTypeException
 import com.ninezero.core.common.util.ApiResponse
 import com.ninezero.core.common.util.apiResponse
 import com.ninezero.core.common.util.authResponse
+import com.ninezero.core.common.util.cursorParams
 import com.ninezero.core.common.util.getIntParam
 import com.ninezero.core.common.util.getOptionalEnumParam
 import com.ninezero.core.common.util.getOptionalStringParam
@@ -40,14 +42,7 @@ fun Route.reviewRoutes() {
                     description = "상품 ID"
                     required = true
                 }
-                queryParameter<String>("cursor") {
-                    description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                    required = false
-                }
-                queryParameter<Int>("limit") {
-                    description = "페이지 크기 (기본값: 20)"
-                    required = false
-                }
+                cursorParams()
                 queryParameter<String>("sortBy") {
                     description = "정렬 방식 (RECENT, RATING_HIGH, RATING_LOW)"
                     required = false
@@ -138,10 +133,7 @@ fun Route.reviewRoutes() {
                         ?: return@post
 
                     if (!call.request.contentType().match(ContentType.MultiPart.FormData)) {
-                        return@post call.respond(
-                            HttpStatusCode.UnsupportedMediaType,
-                            ApiResponse.error<Unit>(Errors.Common.MULTIPART_REQUIRED)
-                        )
+                        throw UnsupportedMediaTypeException(Errors.Common.MULTIPART_REQUIRED)
                     }
 
                     var rating: Int? = null
@@ -228,10 +220,7 @@ fun Route.reviewRoutes() {
                         ?: return@put
 
                     if (!call.request.contentType().match(ContentType.MultiPart.FormData)) {
-                        return@put call.respond(
-                            HttpStatusCode.UnsupportedMediaType,
-                            ApiResponse.error<Unit>(Errors.Common.MULTIPART_REQUIRED)
-                        )
+                        throw UnsupportedMediaTypeException(Errors.Common.MULTIPART_REQUIRED)
                     }
 
                     var rating: Int? = null
@@ -302,14 +291,7 @@ fun Route.reviewRoutes() {
                         description = "사용자 ID"
                         required = true
                     }
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
                 response {

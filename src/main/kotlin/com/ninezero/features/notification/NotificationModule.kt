@@ -4,6 +4,7 @@ import com.ninezero.features.notification.data.NotificationPreferenceRepository
 import com.ninezero.features.notification.data.NotificationPreferenceRepositoryImpl
 import com.ninezero.features.notification.data.NotificationRepository
 import com.ninezero.features.notification.data.NotificationRepositoryImpl
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.notification.domain.NotificationService
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
@@ -16,4 +17,5 @@ val notificationModule = module {
 
     // Services
     singleOf(::NotificationService)
+    singleOf(::NotificationSender)
 }

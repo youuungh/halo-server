@@ -14,7 +14,7 @@ import com.ninezero.core.database.entities.upload.MediaDraftDao
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.VideoProcessingService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.*
 import com.ninezero.features.social.domain.CommentService
 import com.ninezero.features.social.domain.PostService
@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
 class CommentServiceTest {
 
     private lateinit var commentService: CommentService
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
     private lateinit var videoProcessingService: VideoProcessingService
@@ -62,15 +62,15 @@ class CommentServiceTest {
             TestDatabase.init()
 
             // mock
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             coEvery {
-                notificationService.sendCommentNotification(any(), any(), any(), any())
+                notificationSender.sendCommentNotification(any(), any(), any(), any())
             } returns null
             coEvery {
-                notificationService.sendReplyNotification(any(), any(), any(), any(), any())
+                notificationSender.sendReplyNotification(any(), any(), any(), any(), any())
             } returns null
             coEvery {
-                notificationService.sendMentionNotification(any(), any(), any(), any(), any(), any())
+                notificationSender.sendMentionNotification(any(), any(), any(), any(), any(), any())
             } returns null
 
             postService = mockk(relaxed = true)
@@ -105,7 +105,7 @@ class CommentServiceTest {
                 bookmarkRepository = BookmarkRepositoryImpl(),
                 userRepository = UserRepositoryImpl(),
                 blockedUserRepository = BlockedUserRepositoryImpl(),
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 postService = postService,
                 fileUploadService = fileUploadService,
                 imageProcessingService = imageProcessingService,
@@ -189,7 +189,7 @@ class CommentServiceTest {
 
             // 대댓글 알림 전송 확인
             coVerify {
-                notificationService.sendReplyNotification(
+                notificationSender.sendReplyNotification(
                     commentOwnerId = user1.id.value,
                     replierId = user2.id.value,
                     postId = post.id.value,
@@ -440,7 +440,7 @@ class CommentServiceTest {
 
             // Then
             coVerify {
-                notificationService.sendCommentNotification(
+                notificationSender.sendCommentNotification(
                     postOwnerId = postOwner.id.value,
                     commenterId = commenter.id.value,
                     postId = post.id.value,
@@ -468,7 +468,7 @@ class CommentServiceTest {
 
             // Then
             coVerify(timeout = 2000) {
-                notificationService.sendMentionNotification(
+                notificationSender.sendMentionNotification(
                     mentionedUserId = minji.id.value,
                     mentionerId = commenter.id.value,
                     postId = post.id.value,
@@ -483,7 +483,7 @@ class CommentServiceTest {
     @Test
     fun `답글 알림을 받는 부모 댓글 작성자는 멘션해도 멘션 알림을 또 받지 않는다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val parentOwner = TestFixtures.createTestUser(email = "parentowner@test.com", username = "parentowner")
             val replier = TestFixtures.createTestUser(email = "replier@test.com", username = "replier")
             val other = TestFixtures.createTestUser(email = "other@test.com", username = "other")
@@ -499,7 +499,7 @@ class CommentServiceTest {
 
             // other 알림이 나간 뒤면 같은 순회의 parentowner 판정도 끝남
             coVerify(timeout = 2000) {
-                notificationService.sendMentionNotification(
+                notificationSender.sendMentionNotification(
                     mentionedUserId = other.id.value,
                     mentionerId = replier.id.value,
                     postId = post.id.value,
@@ -509,7 +509,7 @@ class CommentServiceTest {
                 )
             }
             coVerify(exactly = 0) {
-                notificationService.sendMentionNotification(
+                notificationSender.sendMentionNotification(
                     mentionedUserId = parentOwner.id.value,
                     mentionerId = any(),
                     postId = any(),
@@ -524,7 +524,7 @@ class CommentServiceTest {
     @Test
     fun `잠긴 글에서 멘션된 비참여자에게는 본문 없이 알린다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val postOwner = TestFixtures.createTestUser(email = "owner@test.com", username = "owner")
             val commenter = TestFixtures.createTestUser(email = "commenter@test.com", username = "commenter")
             val outsider = TestFixtures.createTestUser(email = "outsider@test.com", username = "outsider")
@@ -539,7 +539,7 @@ class CommentServiceTest {
                 )
 
                 coVerify(timeout = 2000) {
-                    notificationService.sendMentionNotification(
+                    notificationSender.sendMentionNotification(
                         mentionedUserId = outsider.id.value,
                         mentionerId = commenter.id.value,
                         postId = post.id.value,

@@ -90,8 +90,8 @@ interface UserRepository {
     suspend fun deleteDeviceToken(userId: Int, deviceId: String): Boolean
     suspend fun deleteStaleDeviceTokens(before: LocalDateTime): Int
     suspend fun deleteDeviceTokensByFids(fids: List<String>): Int
-    suspend fun getDeviceFidsForUser(userId: Int): List<String>
-    suspend fun getDeviceFidsForUsers(userIds: Collection<Int>): List<String>
+    suspend fun findDeviceFidsForUser(userId: Int): List<String>
+    suspend fun findDeviceFidsForUsers(userIds: Collection<Int>): List<String>
     suspend fun deleteAllDeviceTokensForUser(userId: Int): Int
 
     // 관리자

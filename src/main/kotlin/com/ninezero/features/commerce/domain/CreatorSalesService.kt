@@ -90,7 +90,7 @@ class CreatorSalesService(
         return query {
             requireCreatorRole(userRepository, creatorId)
 
-            val agg = orderRepository.aggregateCreatorSales(creatorId, start, end)
+            val aggregate = orderRepository.aggregateCreatorSales(creatorId, start, end)
             val top = orderRepository.topCreatorProducts(creatorId, start, end, BEST_SELLER_LIMIT)
 
             // 최근 6개월 추이
@@ -103,29 +103,29 @@ class CreatorSalesService(
                 )
             }
 
-            val net = agg.grossRevenue - agg.refundAmount
-            val avgOrderValue = if (agg.orderCount > 0) {
-                agg.grossRevenue.divide(BigDecimal(agg.orderCount), 0, RoundingMode.HALF_UP)
+            val net = aggregate.grossRevenue - aggregate.refundAmount
+            val avgOrderValue = if (aggregate.orderCount > 0) {
+                aggregate.grossRevenue.divide(BigDecimal(aggregate.orderCount), 0, RoundingMode.HALF_UP)
             } else {
                 BigDecimal.ZERO
             }
 
             CreatorMonthlySalesResponse(
                 month = yearMonth.toString(),
-                grossRevenue = agg.grossRevenue.toAmountString(),
-                refundAmount = agg.refundAmount.toAmountString(),
+                grossRevenue = aggregate.grossRevenue.toAmountString(),
+                refundAmount = aggregate.refundAmount.toAmountString(),
                 netRevenue = net.toAmountString(),
-                orderCount = agg.orderCount,
-                quantitySold = agg.quantitySold,
+                orderCount = aggregate.orderCount,
+                quantitySold = aggregate.quantitySold,
                 avgOrderValue = avgOrderValue.toAmountString(),
-                shippingFees = agg.shippingFees.toAmountString(),
-                couponDiscounts = agg.couponDiscounts.toAmountString(),
+                shippingFees = aggregate.shippingFees.toAmountString(),
+                couponDiscounts = aggregate.couponDiscounts.toAmountString(),
                 statusBreakdown = SalesStatusBreakdownResponse(
-                    pending = agg.pendingCount,
-                    confirmed = agg.confirmedCount,
-                    shipping = agg.shippingCount,
-                    delivered = agg.deliveredCount,
-                    cancelled = agg.cancelledCount
+                    pending = aggregate.pendingCount,
+                    confirmed = aggregate.confirmedCount,
+                    shipping = aggregate.shippingCount,
+                    delivered = aggregate.deliveredCount,
+                    cancelled = aggregate.cancelledCount
                 ),
                 monthlyTrend = trend,
                 bestSellers = top.map {

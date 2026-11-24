@@ -16,7 +16,6 @@ import com.ninezero.core.common.exception.SubscriptionPlanNotFoundException
 import com.ninezero.core.common.exception.UserNotFoundException
 import com.ninezero.core.common.exception.ValidationException
 import com.ninezero.core.common.util.PaginationInfo
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.common.util.createPagedResponse
 import com.ninezero.core.common.util.encodeToJson
 import com.ninezero.core.common.util.query
@@ -48,9 +47,9 @@ class SubscriptionPlanService(
         val name = request.name.trim()
         val description = request.description.trim()
 
-        ValidationUtils.validatePlanName(name)
-        ValidationUtils.validatePlanDescription(description)
-        ValidationUtils.validatePlanBenefits(request.benefits)
+        SubscriptionValidation.validatePlanName(name)
+        SubscriptionValidation.validatePlanDescription(description)
+        SubscriptionValidation.validatePlanBenefits(request.benefits)
 
         val price = try {
             BigDecimal(request.price)
@@ -165,15 +164,15 @@ class SubscriptionPlanService(
         val description = request.description?.trim()
 
         name?.let {
-            ValidationUtils.validatePlanName(it)
+            SubscriptionValidation.validatePlanName(it)
         }
 
         description?.let {
-            ValidationUtils.validatePlanDescription(it)
+            SubscriptionValidation.validatePlanDescription(it)
         }
 
         request.benefits?.let {
-            ValidationUtils.validatePlanBenefits(it)
+            SubscriptionValidation.validatePlanBenefits(it)
         }
 
         val price = request.price?.let {
@@ -192,7 +191,7 @@ class SubscriptionPlanService(
         }
 
         val response = query {
-            val plan = verifyPlanOwnership(planId, creatorId, Errors.Subscription.PLAN_UPDATE_PERMISSION_DENIED)
+            val plan = requireOwnedPlan(planId, creatorId, Errors.Subscription.PLAN_UPDATE_PERMISSION_DENIED)
 
             val creator = userRepository.findUserById(creatorId)
                 ?: throw UserNotFoundException(creatorId)
@@ -237,7 +236,7 @@ class SubscriptionPlanService(
 
     suspend fun deletePlan(planId: Int, creatorId: Int): String {
         query {
-            verifyPlanOwnership(planId, creatorId, Errors.Subscription.PLAN_DELETE_PERMISSION_DENIED)
+            requireOwnedPlan(planId, creatorId, Errors.Subscription.PLAN_DELETE_PERMISSION_DENIED)
 
             val activeSubscriberCount = subscriptionRepository.countPlanSubscribers(planId)
             if (activeSubscriberCount > 0) {
@@ -271,7 +270,7 @@ class SubscriptionPlanService(
         if (violates) throw InvalidPriceException(Errors.Subscription.TIER_PRICE_ORDER_INVALID)
     }
 
-    private suspend fun verifyPlanOwnership(
+    private suspend fun requireOwnedPlan(
         planId: Int,
         creatorId: Int,
         errorMessage: String

@@ -10,7 +10,7 @@ import com.ninezero.core.database.entities.social.PostMediaDao
 import com.ninezero.core.database.entities.social.PostMediaTable
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.VideoProcessingService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.*
 import com.ninezero.features.social.communityCreatorId
 import com.ninezero.features.social.data.BookmarkRepository
@@ -46,7 +46,7 @@ class PostService(
     private val subscriptionRepository: SubscriptionRepository,
     private val planRepository: SubscriptionPlanRepository,
     private val blockedUserRepository: BlockedUserRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val mediaDraftService: MediaDraftService,
     private val fileUploadService: FileUploadService,
     private val videoProcessingService: VideoProcessingService,
@@ -55,12 +55,13 @@ class PostService(
 ) {
     private val logger = logger()
 
-    // 포스트 생성
+    // =====  포스트 생성 =====
+
     suspend fun createPost(userId: Int, request: PostRequest): PostResponse {
         val content = request.content.trim()
 
-        ValidationUtils.validatePostContent(content)
-        ValidationUtils.validateClientRequestId(request.clientRequestId)
+        SocialValidation.validatePostContent(content)
+        SocialValidation.validateClientRequestId(request.clientRequestId)
         if (request.postType == PostType.TEXT && request.mediaDraftIds.isNotEmpty()) {
             throw InvalidInputException(Errors.Social.Media.TEXT_POST_WITH_MEDIA)
         }
@@ -136,13 +137,14 @@ class PostService(
         cacheService.invalidatePostCaches(post.id.value, userId, communityCreatorId = null)
 
         if (post.contextType == PostContextType.CREATOR_FEED) {
-            launchNewPostNotifications(coroutineScope, followRepository, notificationService, userId, response.author.username, post.id.value)
+            launchNewPostNotifications(coroutineScope, followRepository, notificationSender, userId, response.author.username, post.id.value)
         }
 
         return response
     }
 
-    // 포스트 조회
+    // =====  포스트 조회 =====
+
     suspend fun getPostById(postId: Int, currentUserId: Int?): PostResponse {
         val cacheKey = CacheKeys.post(postId, currentUserId)
         cacheService.getJson<PostResponse>(cacheKey)?.let {
@@ -172,18 +174,7 @@ class PostService(
                 throw UserBlockedException(Errors.User.Block.USER_BLOCKED)
             }
 
-            val canAccess = if (currentUserId != null) {
-                checkPostAccess(currentUserId, post)
-            } else {
-                TierAccessEvaluator.canAccess(
-                    viewerId = null,
-                    ownerId = post.userId,
-                    creatorId = post.creatorId,
-                    requiredTier = post.requiredTier,
-                    isSecret = post.isSecret,
-                    viewerTier = null
-                )
-            }
+            val canAccess = checkPostAccess(currentUserId, post)
 
             // 접근 가능할 때만 조회수 증가
             if (canAccess) {
@@ -206,11 +197,12 @@ class PostService(
         return response
     }
 
-    // 포스트 수정
+    // =====  포스트 수정 =====
+
     suspend fun updatePost(postId: Int, userId: Int, request: UpdatePostRequest): PostResponse {
         val content = request.content.trim()
 
-        ValidationUtils.validatePostContent(content)
+        SocialValidation.validatePostContent(content)
 
         val extractedTags = extractHashtags(content)
 
@@ -256,7 +248,8 @@ class PostService(
         return response
     }
 
-    // 포스트 삭제
+    // =====  포스트 삭제 =====
+
     /** 포스트 삭제와 파일 회수 */
     suspend fun deletePost(postId: Int, userId: Int) {
         val (mediaAttachments, communityCreatorId) = query {
@@ -282,13 +275,14 @@ class PostService(
 
         // 지운 글로 가는 새 글 알림 정리
         try {
-            notificationService.deactivateNewPostNotifications(postId)
+            notificationSender.deactivateNewPostNotifications(postId)
         } catch (e: Exception) {
             logger.warn("새 글 알림 정리 실패: postId={}, error={}", postId, e.message)
         }
     }
 
-    // 피드 고정
+    // =====  피드 고정 =====
+
     suspend fun togglePinPostInFeed(postId: Int, creatorId: Int): PinToggleResponse {
         val isPinned = query {
             val user = userRepository.findUserById(creatorId)
@@ -360,7 +354,8 @@ class PostService(
         return response
     }
 
-    // 프로필 섹션
+    // =====  프로필 섹션 =====
+
     suspend fun getCreatorProfileSections(
         creatorId: Int,
         currentUserId: Int?,
@@ -412,7 +407,11 @@ class PostService(
                 limit = validLimit
             )
 
-            val allPostsList = pinnedPosts + topTagSections.flatMap { (_, posts, _) -> posts } + allPosts
+            val allPostsList = buildList {
+                addAll(pinnedPosts)
+                topTagSections.flatMapTo(this) { (_, posts, _) -> posts }
+                addAll(allPosts)
+            }
 
             val userIds = allPostsList.map { it.userId }.distinct()
             val users = userRepository.findUsersByIds(userIds)
@@ -471,7 +470,8 @@ class PostService(
         return response
     }
 
-    // 포스트 목록
+    // =====  포스트 목록 =====
+
     suspend fun getUserPosts(
         targetUserId: Int,
         currentUserId: Int?,
@@ -545,7 +545,8 @@ class PostService(
         }
     }
 
-    // 관리자 조회
+    // =====  관리자 조회 =====
+
     suspend fun getAdminPosts(page: Int, limit: Int = Constants.DEFAULT_PAGE_LIMIT): PaginatedResponse<AdminPostResponse> {
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
@@ -575,17 +576,19 @@ class PostService(
         }
     }
 
-    // 접근 판정
-    suspend fun checkPostAccess(userId: Int, post: PostDao): Boolean {
+    // =====  접근 판정 =====
+
+    /** 비로그인(null)은 공개 글만 */
+    suspend fun checkPostAccess(userId: Int?, post: PostDao): Boolean {
         // 잠금 글이고 본인·크리에이터 아닐 때만 구독 조회
         val viewerTier = if (
+            userId != null &&
             !post.isSecret &&
             post.requiredTier != SubscriptionPlanTier.FREE &&
             userId != post.userId &&
             userId != post.creatorId
         ) {
-            subscriptionRepository.findActiveSubscription(userId, post.creatorId ?: post.userId)
-                ?.let { planRepository.findPlanById(it.planId)?.tier }
+            subscriptionRepository.findActiveTier(userId, post.creatorId ?: post.userId)
         } else null
 
         return TierAccessEvaluator.canAccess(
@@ -605,18 +608,15 @@ class PostService(
         return currentUserId == null || !checkPostAccess(currentUserId, post)  // 참여자만 열람
     }
 
-    suspend fun checkMultiplePostAccess(userId: Int, posts: List<PostDao>): Map<Int, Boolean> {
+    suspend fun checkMultiplePostAccess(userId: Int?, posts: List<PostDao>): Map<Int, Boolean> {
         val creatorIds = posts.mapNotNull { it.creatorId }.distinct()
 
         // 판정은 TierAccessEvaluator
-        val subscriptions = if (creatorIds.isEmpty()) emptyList()
-            else subscriptionRepository.findActiveSubscriptionsByCreators(userId, creatorIds)
-        val subscriptionMap = subscriptions.associateBy { it.creatorId }
-        val planMap = if (subscriptions.isEmpty()) emptyMap()
-            else planRepository.findPlansByIds(subscriptions.map { it.planId }.distinct()).associateBy { it.id.value }
+        val tiers = if (userId == null) emptyMap()
+            else subscriptionRepository.findActiveTiersByCreators(userId, creatorIds)
 
         return posts.associate { post ->
-            val viewerTier = subscriptionMap[post.creatorId ?: post.userId]?.let { planMap[it.planId]?.tier }
+            val viewerTier = tiers[post.creatorId ?: post.userId]
             post.id.value to TierAccessEvaluator.canAccess(
                 viewerId = userId,
                 ownerId = post.userId,
@@ -628,8 +628,9 @@ class PostService(
         }
     }
 
-    // 공통 보조
-    private data class PostStatusMaps(
+    // =====  공통 보조 =====
+
+    internal data class PostStatusMaps(
         val likeStatusMap: Map<Int, Boolean>,
         val bookmarkStatusMap: Map<Int, Boolean>,
         val accessMap: Map<Int, Boolean>,
@@ -645,7 +646,7 @@ class PostService(
         )
     }
 
-    private suspend fun buildPostStatusMaps(currentUserId: Int?, posts: List<PostDao>): PostStatusMaps {
+    internal suspend fun buildPostStatusMaps(currentUserId: Int?, posts: List<PostDao>): PostStatusMaps {
         val postIds = posts.map { it.id.value }
         val likeStatusMap = if (currentUserId != null) {
             likeRepository.checkMultipleLikes(currentUserId, LikeType.POST, postIds)
@@ -662,20 +663,7 @@ class PostService(
         } else {
             emptyMap()
         }
-        val accessMap = if (currentUserId != null) {
-            checkMultiplePostAccess(currentUserId, posts)
-        } else {
-            posts.associate {
-                it.id.value to TierAccessEvaluator.canAccess(
-                    viewerId = null,
-                    ownerId = it.userId,
-                    creatorId = it.creatorId,
-                    requiredTier = it.requiredTier,
-                    isSecret = it.isSecret,
-                    viewerTier = null
-                )
-            }
-        }
+        val accessMap = checkMultiplePostAccess(currentUserId, posts)
         val mediaItemsMap = batchLoadPostMediaItems(postIds)
 
         return PostStatusMaps(likeStatusMap, bookmarkStatusMap, accessMap, mediaItemsMap, followStatusMap)

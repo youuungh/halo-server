@@ -10,7 +10,6 @@ import com.ninezero.core.common.exception.PaymentAmountMismatchException
 import com.ninezero.core.common.exception.PaymentConfirmFailedException
 import com.ninezero.core.common.exception.PaymentNotFoundException
 import com.ninezero.core.common.exception.PaymentResultUnknownException
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.common.util.logger
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.query
@@ -56,7 +55,7 @@ class PaymentService(
         query {
             val order = requireOwnedOrder(orderRepository, orderId, userId, Errors.Commerce.Payment.PAYMENT_PERMISSION_DENIED)
 
-            ValidationUtils.validatePaymentAmount(order.totalPrice)
+            CommerceValidation.validatePaymentAmount(order.totalPrice)
 
             val payment = paymentRepository.findByOrderId(orderId)
                 ?: throw PaymentNotFoundException(Errors.Commerce.Payment.PAYMENT_NOT_FOUND)

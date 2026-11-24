@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 private const val FFMPEG_TIMEOUT_SECONDS: Long = 120L
 
 /** 출력 없이 실행한 결과 성공 여부 */
-fun ProcessBuilder.runQuietly(): Boolean {
+fun ProcessBuilder.runSilently(): Boolean {
     val process = redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
     // 타임아웃 초과 시 강제 종료
     if (!process.waitFor(FFMPEG_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

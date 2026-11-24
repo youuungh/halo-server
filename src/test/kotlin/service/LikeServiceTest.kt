@@ -7,7 +7,7 @@ import com.ninezero.core.common.exception.*
 import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.social.CommentDao
 import com.ninezero.core.database.entities.social.PostDao
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.BookmarkRepositoryImpl
 import com.ninezero.features.social.data.CommentRepositoryImpl
 import com.ninezero.features.social.data.FollowRepositoryImpl
@@ -37,7 +37,7 @@ import kotlin.test.assertTrue
 class LikeServiceTest {
 
     private lateinit var likeService: LikeService
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var postService: PostService
     private lateinit var blockedUserRepository: BlockedUserRepositoryImpl
     private lateinit var followRepository: FollowRepositoryImpl
@@ -49,12 +49,12 @@ class LikeServiceTest {
             TestDatabase.init()
 
             // Mock 객체 생성 (알림은 성공으로 가정)
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             coJustRun {
-                notificationService.sendLikePostNotification(any(), any(), any())
+                notificationSender.sendLikePostNotification(any(), any(), any())
             }
             coJustRun {
-                notificationService.sendLikeCommentNotification(any(), any(), any(), any())
+                notificationSender.sendLikeCommentNotification(any(), any(), any(), any())
             }
 
             postService = mockk(relaxed = true)
@@ -68,7 +68,7 @@ class LikeServiceTest {
                 postRepository = PostRepositoryImpl(),
                 commentRepository = CommentRepositoryImpl(),
                 userRepository = UserRepositoryImpl(),
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 bookmarkRepository = BookmarkRepositoryImpl(),
                 postService = postService,
                 followRepository = followRepository,
@@ -163,7 +163,7 @@ class LikeServiceTest {
 
             // Then - 알림 전송 확인
             coVerify {
-                notificationService.sendLikePostNotification(
+                notificationSender.sendLikePostNotification(
                     postOwnerId = postOwner.id.value,
                     likerId = liker.id.value,
                     postId = post.id.value
@@ -204,7 +204,7 @@ class LikeServiceTest {
     fun `차단 관계에서는 댓글 좋아요 알림을 보내지 않는다`() {
         runBlocking {
             // Given
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val (commentOwner, liker) = TestFixtures.createTestUsers(count = 2)
             val post = TestFixtures.createTestPost(userId = commentOwner.id.value)
             val comment = TestFixtures.createTestComment(userId = commentOwner.id.value, postId = post.id.value)
@@ -214,7 +214,7 @@ class LikeServiceTest {
             likeService.toggleCommentLike(liker.id.value, comment.id.value)
 
             // Then
-            coVerify(exactly = 0) { notificationService.sendLikeCommentNotification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendLikeCommentNotification(any(), any(), any(), any()) }
         }
     }
 

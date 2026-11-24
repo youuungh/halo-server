@@ -25,9 +25,7 @@ fun ProductDao.toProductResponse(
     val imageList = imageUrls.decodeJsonToList()
     val detailContentList = detailContent.decodeDetailContent()
     val tagList = tags.decodeJsonToList()
-
-    // 타임딜 활성 시 딜가로 override
-    val pricing = dealPricingAt(nowUtc())
+    val pricing = dealPricingAt(nowUtc())  // 타임딜 활성 시 딜가로 override
 
     return ProductResponse(
         id = id.value,
@@ -85,18 +83,18 @@ fun computeDealPricing(
     // 딜가 > 0이고 시작 이상 종료 미만 구간
     val active = dealPrice != null && dealStartAt != null && dealEndAt != null &&
         dealPrice > BigDecimal.ZERO && now >= dealStartAt && now < dealEndAt
-    val effPrice = if (active) dealPrice else price  // 타임딜 활성 시 딜가, 아니면 판매가
-    val effOriginal = if (active) (originalPrice ?: price) else originalPrice  // 타임딜 활성 시 원가 또는 판매가, 아니면 원가
+    val actualPrice = if (active) dealPrice else price  // 타임딜 활성 시 딜가, 아니면 판매가
+    val actualOriginal = if (active) (originalPrice ?: price) else originalPrice  // 타임딜 활성 시 원가 또는 판매가, 아니면 원가
 
     // 저장 자릿수로 맞춰 문자열 복원값도 같은 할인율
-    val discountRate = if (effOriginal != null && effOriginal > BigDecimal.ZERO) {
-        val original = effOriginal.setScale(2, RoundingMode.HALF_UP)
-        val discount = ((original - effPrice.setScale(2, RoundingMode.HALF_UP)) / original) * BigDecimal(100)
+    val discountRate = if (actualOriginal != null && actualOriginal > BigDecimal.ZERO) {
+        val original = actualOriginal.setScale(2, RoundingMode.HALF_UP)
+        val discount = ((original - actualPrice.setScale(2, RoundingMode.HALF_UP)) / original) * BigDecimal(100)
         discount.setScale(0, RoundingMode.HALF_UP).toInt()
     } else {
         null
     }
-    return DealPricing(effPrice, effOriginal, discountRate, active)
+    return DealPricing(actualPrice, actualOriginal, discountRate, active)
 }
 
 fun ProductDao.dealPricingAt(now: LocalDateTime = nowUtc()): DealPricing =

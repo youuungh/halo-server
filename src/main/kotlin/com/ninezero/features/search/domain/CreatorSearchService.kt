@@ -32,7 +32,7 @@ class CreatorSearchService(
         saveHistory: Boolean = true
     ): CreatorSearchListResponse {
         val trimmedKeyword = keyword.trim()
-        ValidationUtils.validateSearchKeywordLength(trimmedKeyword)
+        SearchValidation.validateSearchKeywordLength(trimmedKeyword)
 
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 

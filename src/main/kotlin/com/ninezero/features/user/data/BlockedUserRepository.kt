@@ -5,7 +5,7 @@ import com.ninezero.core.database.entities.user.BlockedUserDao
 
 interface BlockedUserRepository {
 
-    // 차단 생성/삭제
+    // 차단 생성·삭제
     suspend fun createBlock(userId: Int, blockedUserId: Int): BlockedUserDao?
     suspend fun deleteBlock(userId: Int, blockedUserId: Int): Boolean
 

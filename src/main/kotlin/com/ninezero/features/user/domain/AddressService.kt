@@ -13,11 +13,11 @@ class AddressService(
     private val addressRepository: AddressRepository
 ) {
 
-    suspend fun findAddresses(userId: Int): List<AddressResponse> = query {
+    suspend fun getAddresses(userId: Int): List<AddressResponse> = query {
         addressRepository.findAddresses(userId).map { it.toAddressResponse() }
     }
 
-    suspend fun findAddress(id: Int, userId: Int): AddressResponse = query {
+    suspend fun getAddress(id: Int, userId: Int): AddressResponse = query {
         addressRepository.findAddress(id, userId)?.toAddressResponse()  // 소유자 검증
             ?: throw NotFoundException(Errors.Address.ADDRESS_NOT_FOUND)
     }

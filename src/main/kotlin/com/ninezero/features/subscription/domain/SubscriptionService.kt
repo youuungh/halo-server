@@ -8,7 +8,7 @@ import com.ninezero.core.common.util.*
 import com.ninezero.core.database.entities.subscription.SubscriptionDao
 import com.ninezero.core.database.entities.user.UserDao
 import com.ninezero.core.database.entities.user.UserTable
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepository
 import com.ninezero.features.subscription.data.SubscriptionPlanRepository
 import com.ninezero.features.subscription.data.SubscriptionRepository
@@ -57,14 +57,15 @@ class SubscriptionService(
     private val planRepository: SubscriptionPlanRepository,
     private val userRepository: UserRepository,
     private val followRepository: FollowRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val subscriptionPaymentService: SubscriptionPaymentService,
     private val cacheService: CacheService,
     private val coroutineScope: CoroutineScope
 ) {
     private val logger = logger()
 
-    // 구독·업그레이드
+    // =====  구독·업그레이드 =====
+
     suspend fun subscribe(userId: Int, request: SubscribeRequest): SubscriptionResponse {
         val created = query {
             // 유저 잠금으로 동시 신청 차단
@@ -148,7 +149,7 @@ class SubscriptionService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendNewSubscriberNotification(
+                notificationSender.sendNewSubscriberNotification(
                     creatorId = created.creator.id,
                     subscriberId = userId,
                     subscriberUsername = created.username,
@@ -211,7 +212,8 @@ class SubscriptionService(
         }
     }
 
-    // 구독 조회
+    // =====  구독 조회 =====
+
     suspend fun getMySubscriptions(
         userId: Int,
         status: SubscriptionStatus?,
@@ -322,7 +324,7 @@ class SubscriptionService(
     /** 자동갱신 해제 */
     suspend fun cancelSubscription(userId: Int, subscriptionId: Int): String {
         val notice = query {
-            val subscription = verifySubscriptionOwnership(subscriptionId, userId, Errors.Subscription.SUBSCRIPTION_CANCEL_PERMISSION_DENIED)
+            val subscription = requireOwnedSubscription(subscriptionId, userId, Errors.Subscription.SUBSCRIPTION_CANCEL_PERMISSION_DENIED)
 
             if (subscription.status != SubscriptionStatus.ACTIVE || !subscription.autoRenew) {
                 throw ValidationException(Errors.Subscription.SUBSCRIPTION_ALREADY_CANCELLED)
@@ -341,7 +343,7 @@ class SubscriptionService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendSubscriptionCancelScheduledNotification(
+                notificationSender.sendSubscriptionCancelScheduledNotification(
                     creatorId = notice.creatorId,
                     subscriberId = userId,
                     subscriberUsername = notice.subscriberUsername,
@@ -362,7 +364,7 @@ class SubscriptionService(
         autoRenew: Boolean
     ): String {
         query {
-            val subscription = verifySubscriptionOwnership(
+            val subscription = requireOwnedSubscription(
                 subscriptionId,
                 userId,
                 Errors.Subscription.SUBSCRIPTION_UPDATE_PERMISSION_DENIED
@@ -402,7 +404,7 @@ class SubscriptionService(
                 }
 
                 notifySubscriber(subscription) { creatorUsername, planName ->
-                    notificationService.sendSubscriptionExpiredNotification(
+                    notificationSender.sendSubscriptionExpiredNotification(
                         subscription.userId, subscription.id.value, creatorUsername, planName
                     )
                 }
@@ -439,7 +441,7 @@ class SubscriptionService(
                         } ?: subscription.expiresAt).toBusinessDate()
 
                         notifySubscriber(subscription) { creatorUsername, planName ->
-                            notificationService.sendSubscriptionRenewedNotification(
+                            notificationSender.sendSubscriptionRenewedNotification(
                                 subscription.userId, subscription.id.value, creatorUsername, planName, nextBillingDate
                             )
                         }
@@ -465,7 +467,7 @@ class SubscriptionService(
                         }
 
                         notifySubscriber(subscription) { creatorUsername, planName ->
-                            notificationService.sendSubscriptionRenewalFailedNotification(
+                            notificationSender.sendSubscriptionRenewalFailedNotification(
                                 subscription.userId, subscription.id.value, creatorUsername, planName, subscription.expiresAt.toBusinessDate()
                             )
                         }
@@ -483,7 +485,8 @@ class SubscriptionService(
         return SubscriptionBatchResult(successCount, failCount, unknownCount)
     }
 
-    // 접근 판정
+    // =====  접근 판정 =====
+
     suspend fun getMyTierForCreator(
         userId: Int,
         creatorId: Int
@@ -515,7 +518,7 @@ class SubscriptionService(
         }
     }
 
-    private suspend fun verifySubscriptionOwnership(
+    private suspend fun requireOwnedSubscription(
         subscriptionId: Int,
         userId: Int,
         errorMessage: String

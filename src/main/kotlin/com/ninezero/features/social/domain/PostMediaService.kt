@@ -85,7 +85,7 @@ class PostMediaService(
             val finalContent = content?.trim()
 
             finalContent?.let {
-                ValidationUtils.validatePostContent(it)
+                SocialValidation.validatePostContent(it)
             }
 
             val files = newFiles.orEmpty()
@@ -175,7 +175,8 @@ class PostMediaService(
         }
     }
 
-    // 공통 보조
+    // =====  공통 보조 =====
+
     /** 트랜잭션 밖에서 부르는 직접 업로드 확인 */
     private suspend fun verifyVideoUploads(
         sources: List<NewMediaSource>,
@@ -231,9 +232,9 @@ class PostMediaService(
         return PreparedMedia(
             type = MediaType.VIDEO,
             url = upload.url,
-            width = video.meta.width,
-            height = video.meta.height,
-            durationMs = video.meta.durationMs,
+            width = video.metadata.width,
+            height = video.metadata.height,
+            durationMs = video.metadata.durationMs,
             thumbnailUrl = video.thumbnail?.let { runCatching { fileUploadService.uploadPostThumbnail(userId, it) }.getOrNull() },
             previewUrl = preview?.let { runCatching { fileUploadService.uploadPostPreview(userId, it) }.getOrNull() },
             uploadId = upload.uploadId

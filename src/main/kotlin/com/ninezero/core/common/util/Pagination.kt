@@ -4,8 +4,6 @@ import com.ninezero.core.common.config.Constants
 import kotlinx.serialization.Serializable
 import kotlin.math.ceil
 
-// 페이지네이션 응답
-
 data class PaginationInfo(
     val page: Int,
     val limit: Int,
@@ -22,6 +20,7 @@ data class PaginationInfo(
     }
 }
 
+/** 페이지네이션 목록 응답 */
 @Serializable
 data class PaginatedResponse<T>(
     val items: List<T>,
@@ -46,8 +45,7 @@ fun <T> createPagedResponse(
     )
 }
 
-// 페이지네이션 파라미터 보정
-
+/** 페이지네이션 파라미터 보정 */
 fun validatePaginationParams(page: Int, limit: Int): Pair<Int, Int> {
     val validPage = maxOf(1, page)
     val validLimit = when {
@@ -58,6 +56,5 @@ fun validatePaginationParams(page: Int, limit: Int): Pair<Int, Int> {
     return validPage to validLimit
 }
 
-// 페이지 오프셋
-
+/** 페이지 오프셋 */
 fun Int.toOffset(limit: Int): Long = ((this - 1) * limit).toLong()

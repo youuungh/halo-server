@@ -2,9 +2,9 @@ package com.ninezero.features.user
 
 import com.ninezero.features.user.data.*
 import com.ninezero.features.user.domain.*
-import com.ninezero.features.user.domain.social.GoogleTokenVerifier
-import com.ninezero.features.user.domain.social.KakaoTokenVerifier
-import com.ninezero.features.user.domain.social.NaverTokenVerifier
+import com.ninezero.features.user.domain.oauth.GoogleTokenVerifier
+import com.ninezero.features.user.domain.oauth.KakaoTokenVerifier
+import com.ninezero.features.user.domain.oauth.NaverTokenVerifier
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -21,15 +21,14 @@ val userModule = module {
 
     // Services
     singleOf(::AccountCleanupService)
+    singleOf(::AuthService)
     single {
-        AuthService(
-            get(), get(), get(), get(), get(), get(), get(), get(),
-            socialTokenVerifiers = listOf(GoogleTokenVerifier(), KakaoTokenVerifier(), NaverTokenVerifier()),
-            fileUploadService = get(),
-            cacheService = get(),
-            webSocketManager = get()
+        SocialAuthService(
+            get(), get(), get(), get(), get(),
+            socialTokenVerifiers = listOf(GoogleTokenVerifier(), KakaoTokenVerifier(), NaverTokenVerifier())
         )
     }
+    singleOf(::PasswordResetService)
     singleOf(::ProfileService)
     singleOf(::UserService)
     singleOf(::CreatorApplicationService)

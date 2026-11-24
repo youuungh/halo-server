@@ -4,15 +4,16 @@ import com.ninezero.core.common.config.ChatMessageType
 import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.exception.NotFoundException
-import com.ninezero.core.common.util.ValidationUtils
-import com.ninezero.core.common.util.createMessagePreview
+import com.ninezero.core.common.util.CommonValidation
 import com.ninezero.core.common.util.logger
 import com.ninezero.core.common.util.query
 import com.ninezero.features.chat.data.ChatRepository
 import com.ninezero.features.chat.data.MessageRepository
+import com.ninezero.features.chat.domain.ChatValidation
 import com.ninezero.features.chat.domain.MessageService
+import com.ninezero.features.chat.domain.createMessagePreview
 import com.ninezero.features.commerce.data.ProductRepository
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.share.presentation.models.request.SharePostRequest
 import com.ninezero.features.share.presentation.models.request.ShareProductRequest
 import com.ninezero.features.share.presentation.models.response.ShareResponse
@@ -31,7 +32,7 @@ class ShareService(
     private val userRepository: UserRepository,
     private val followRepository: FollowRepository,
     private val blockedUserRepository: BlockedUserRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val messageService: MessageService,
     private val coroutineScope: CoroutineScope
 ) {
@@ -50,8 +51,8 @@ class ShareService(
     private data class RoomMessages(val roomId: Int, val messageIds: MutableList<Int> = mutableListOf())
 
     suspend fun sharePost(currentUserId: Int, request: SharePostRequest): ShareResponse {
-        ValidationUtils.validateClientTempId(request.clientTempId)
-        ValidationUtils.validateClientTempId(request.messageTempId)
+        ChatValidation.validateClientTempId(request.clientTempId)
+        ChatValidation.validateClientTempId(request.messageTempId)
         val sanitizedMessage = sanitizeShareMessage(request.message)
 
         val delivery = query {
@@ -98,8 +99,8 @@ class ShareService(
     }
 
     suspend fun shareProduct(currentUserId: Int, request: ShareProductRequest): ShareResponse {
-        ValidationUtils.validateClientTempId(request.clientTempId)
-        ValidationUtils.validateClientTempId(request.messageTempId)
+        ChatValidation.validateClientTempId(request.clientTempId)
+        ChatValidation.validateClientTempId(request.messageTempId)
         val sanitizedMessage = sanitizeShareMessage(request.message)
 
         val delivery = query {
@@ -223,7 +224,7 @@ class ShareService(
                 try {
                     // 열린 채팅 화면에 실시간 반영
                     messageService.pushToReceiver(recipientId, room.messageIds)
-                    notificationService.sendChatMessageNotification(recipientId, currentUserId, room.roomId, preview)
+                    notificationSender.sendChatMessageNotification(recipientId, currentUserId, room.roomId, preview)
                 } catch (e: Exception) {
                     logger.error("공유 알림 전송 실패: $logContext, recipientId=$recipientId, error=${e.message}", e)
                 }
@@ -232,7 +233,7 @@ class ShareService(
     }
 
     private suspend fun resolveShareRecipients(currentUserId: Int, recipientUserIds: List<Int>): List<Int> {
-        ValidationUtils.validateTargetIds(recipientUserIds)
+        CommonValidation.validateTargetIds(recipientUserIds)
 
         val dedupedRecipients = recipientUserIds
             .distinct()
@@ -267,7 +268,7 @@ class ShareService(
 
     private fun sanitizeShareMessage(message: String?): String? {
         val normalizedMessage = message?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        ValidationUtils.validateChatMessage(normalizedMessage)
+        ChatValidation.validateChatMessage(normalizedMessage)
         return normalizedMessage.trim()
     }
 }

@@ -14,7 +14,7 @@ import com.ninezero.core.database.entities.user.UserTable
 import com.ninezero.features.commerce.data.OrderRepository
 import com.ninezero.features.commerce.data.ProductRepository
 import com.ninezero.features.coupon.data.CouponRepository
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.PostRepository
 import com.ninezero.features.subscription.data.SubscriptionPlanRepository
 import com.ninezero.features.subscription.data.SubscriptionRepository
@@ -43,7 +43,7 @@ class CreatorApplicationService(
     private val productRepository: ProductRepository,
     private val postRepository: PostRepository,
     private val couponRepository: CouponRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val coroutineScope: CoroutineScope,
     private val cacheService: CacheService
 ) {
@@ -54,7 +54,8 @@ class CreatorApplicationService(
         val postIds: List<Int>
     )
 
-    // 신청
+    // =====  신청 =====
+
     suspend fun applyForCreator(
         userId: Int,
         request: CreatorApplicationRequest
@@ -78,18 +79,18 @@ class CreatorApplicationService(
         if (reviewedAt != null) {
             val daysDiff = (Clock.System.now() - reviewedAt.toInstant(TimeZone.UTC)).inWholeDays
 
-            if (daysDiff < Constants.User.CREATOR_REAPPLY_COOLDOWN_DAYS) {
-                val remainingDays = Constants.User.CREATOR_REAPPLY_COOLDOWN_DAYS - daysDiff
+            if (daysDiff < Constants.User.CREATOR_REAPPLY_WAIT_DAYS) {
+                val remainingDays = Constants.User.CREATOR_REAPPLY_WAIT_DAYS - daysDiff
                 throw ValidationException(
-                    "거절 후 ${Constants.User.CREATOR_REAPPLY_COOLDOWN_DAYS}일 이후에 재신청 가능합니다. (${remainingDays}일 남음)"
+                    "거절 후 ${Constants.User.CREATOR_REAPPLY_WAIT_DAYS}일 이후에 재신청 가능합니다. (${remainingDays}일 남음)"
                 )
             }
         }
 
         val reason = request.reason.trim()
-        val portfolioUrl = request.portfolioUrl?.let { ValidationUtils.sanitizeUrl(it) }
+        val portfolioUrl = request.portfolioUrl?.let { UserValidation.sanitizeUrl(it) }
 
-        ValidationUtils.validateCreatorApplicationReason(reason)
+        UserValidation.validateCreatorApplicationReason(reason)
 
         val application = query {
             // 같은 유저의 동시 신청 직렬화 후 PENDING 재검사
@@ -160,7 +161,8 @@ class CreatorApplicationService(
         return createPagedResponse(responses, pagination)
     }
 
-    // 승인/거절
+    // =====  승인·거절 =====
+
     suspend fun approveApplication(
         applicationId: Int,
         adminId: Int
@@ -177,7 +179,7 @@ class CreatorApplicationService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendCreatorApprovedNotification(
+                notificationSender.sendCreatorApprovedNotification(
                     userId = applicantUserId,
                     applicationId = applicationId
                 )
@@ -195,7 +197,7 @@ class CreatorApplicationService(
         request: RejectApplicationRequest
     ): String {
         val rejectionReason = request.rejectionReason.trim()
-        ValidationUtils.validateRejectionReason(rejectionReason)
+        UserValidation.validateRejectionReason(rejectionReason)
 
         val applicantUserId = query {
             applicationRepository.rejectApplication(applicationId, adminId, rejectionReason)
@@ -203,7 +205,7 @@ class CreatorApplicationService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendCreatorRejectedNotification(
+                notificationSender.sendCreatorRejectedNotification(
                     userId = applicantUserId,
                     applicationId = applicationId,
                     rejectionReason = rejectionReason
@@ -216,10 +218,11 @@ class CreatorApplicationService(
         return Messages.User.APPLICATION_REJECTED
     }
 
-    // 강등/셀프 해제
+    // =====  강등·셀프 해제 =====
+
     suspend fun demoteCreator(userId: Int, reason: String, adminId: Int): String {
         val trimmedReason = reason.trim()
-        ValidationUtils.validateRejectionReason(trimmedReason)
+        UserValidation.validateRejectionReason(trimmedReason)
 
         val result = teardownCreatorAssets(
             userId = userId,
@@ -231,7 +234,7 @@ class CreatorApplicationService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendCreatorDemotedNotification(userId, trimmedReason)
+                notificationSender.sendCreatorDemotedNotification(userId, trimmedReason)
             } catch (e: Exception) {
                 logger.warn("알림 발송 실패: {}", e.message)
             }
@@ -240,7 +243,7 @@ class CreatorApplicationService(
         return Messages.User.CREATOR_DEMOTED
     }
 
-    suspend fun revokeSelf(userId: Int): String {
+    suspend fun leaveCreator(userId: Int): String {
         val result = teardownCreatorAssets(
             userId = userId,
             reason = Messages.User.CREATOR_SELF_REVOKE_REASON,
@@ -252,7 +255,8 @@ class CreatorApplicationService(
         return Messages.User.CREATOR_SELF_REVOKED  // 본인 액션 알림 없음
     }
 
-    // 신청 취소
+    // =====  신청 취소 =====
+
     suspend fun cancelApplication(userId: Int) {
         query {
             val application = applicationRepository.findByUserId(userId)
@@ -266,7 +270,8 @@ class CreatorApplicationService(
         }
     }
 
-    // 통계
+    // =====  통계 =====
+
     suspend fun getCreatorStatistics(): CreatorStatisticsResponse {
         val (todayStart, tomorrowStart, weekStart, monthStart) = statisticsDateBoundaries()
 

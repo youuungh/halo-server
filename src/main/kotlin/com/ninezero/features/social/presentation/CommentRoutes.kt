@@ -34,14 +34,7 @@ fun Route.commentRoutes() {
                         description = "포스트 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("sort") {
                         description = "정렬 방식: POPULAR (인기순, 기본값), LATEST (최신순)"
                         required = false
@@ -99,14 +92,7 @@ fun Route.commentRoutes() {
                         description = "부모 댓글 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("sort") {
                         description = "정렬 방식: POPULAR (인기순, 기본값), LATEST (최신순)"
                         required = false

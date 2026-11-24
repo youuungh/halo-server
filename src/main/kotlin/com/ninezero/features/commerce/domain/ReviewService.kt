@@ -19,7 +19,7 @@ import com.ninezero.features.commerce.presentation.models.response.ReviewListRes
 import com.ninezero.features.commerce.presentation.models.response.ReviewResponse
 import com.ninezero.features.commerce.presentation.models.response.ReviewSummaryResponse
 import com.ninezero.features.commerce.toReviewResponse
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
 import kotlinx.coroutines.CoroutineScope
@@ -33,8 +33,8 @@ class ReviewService(
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
     private val userRepository: UserRepository,
-    private val notificationService: NotificationService,
-    private val productService: ProductService,
+    private val notificationSender: NotificationSender,
+    private val productAccessService: ProductAccessService,
     private val fileUploadService: FileUploadService,
     private val imageProcessingService: ImageProcessingService,
     private val cacheService: CacheService,
@@ -42,7 +42,8 @@ class ReviewService(
 ) {
     private val logger = logger()
 
-    // 리뷰 생성
+    // =====  리뷰 생성 =====
+
     suspend fun createReview(userId: Int, request: ReviewRequest): ReviewResponse {
         val (response, creatorId) = insertReview(userId, request)
         publishReviewCreated(userId, request.productId, response.id, creatorId)
@@ -116,7 +117,7 @@ class ReviewService(
             throw InvalidInputException(Errors.Commerce.Review.REVIEW_RATING_INVALID)
         }
 
-        ValidationUtils.validateReviewContent(content)
+        CommerceValidation.validateReviewContent(content)
 
         val (response, creatorId) = query {
             val order = requireOwnedOrder(
@@ -182,7 +183,7 @@ class ReviewService(
         if (creatorId != userId) {
             coroutineScope.launch {
                 try {
-                    notificationService.sendProductReviewedNotification(
+                    notificationSender.sendProductReviewedNotification(
                         creatorId = creatorId,
                         userId = userId,
                         productId = productId,
@@ -198,7 +199,8 @@ class ReviewService(
         cacheService.delete(CacheKeys.reviewSummary(productId))
     }
 
-    // 리뷰 조회
+    // =====  리뷰 조회 =====
+
     suspend fun getReviewsByProduct(
         productId: Int,
         cursor: String? = null,
@@ -255,7 +257,7 @@ class ReviewService(
         // 삭제 상품 포함
         val productIds = reviews.map { it.productId }.distinct()
         val products = productRepository.findProductsByIdsWithDeleted(productIds).associateBy { it.id.value }
-        val accessMap = productService.getProductAccessMap(currentUserId, products.values)
+        val accessMap = productAccessService.getAccessMap(currentUserId, products.values)
 
         val reviewResponses = reviews.map { review ->
             val product = products[review.productId]
@@ -292,7 +294,8 @@ class ReviewService(
         return response
     }
 
-    // 리뷰 수정
+    // =====  리뷰 수정 =====
+
     suspend fun updateReview(reviewId: Int, userId: Int, request: UpdateReviewRequest): ReviewResponse =
         applyReviewUpdate(reviewId, userId, request, serverUploaded = emptySet())
 
@@ -305,7 +308,7 @@ class ReviewService(
         val content = request.content?.trim()
 
         content?.let {
-            ValidationUtils.validateReviewContent(it)
+            CommerceValidation.validateReviewContent(it)
         }
 
         request.rating?.let {
@@ -321,7 +324,7 @@ class ReviewService(
         }
 
         val (response, productId, removedImages) = query {
-            val review = verifyReviewOwnership(
+            val review = requireOwnedReview(
                 reviewId = reviewId,
                 userId = userId,
                 errorMessage = Errors.Commerce.Review.REVIEW_UPDATE_PERMISSION_DENIED
@@ -381,7 +384,7 @@ class ReviewService(
 
         // 유지 목록이 없으면 기존 이미지 뒤에 추가
         val kept = keepImages ?: query {
-            verifyReviewOwnership(
+            requireOwnedReview(
                 reviewId = reviewId,
                 userId = userId,
                 errorMessage = Errors.Commerce.Review.REVIEW_UPDATE_PERMISSION_DENIED
@@ -424,10 +427,11 @@ class ReviewService(
         }
     }
 
-    // 리뷰 삭제
+    // =====  리뷰 삭제 =====
+
     suspend fun deleteReview(reviewId: Int, userId: Int) {
         val (deleted, imageUrls, productId) = query {
-            val review = verifyReviewOwnership(
+            val review = requireOwnedReview(
                 reviewId = reviewId,
                 userId = userId,
                 errorMessage = Errors.Commerce.Review.REVIEW_DELETE_PERMISSION_DENIED
@@ -449,7 +453,8 @@ class ReviewService(
         invalidateReviewCaches(reviewId, productId)
     }
 
-    // 리뷰 요약
+    // =====  리뷰 요약 =====
+
     suspend fun getReviewSummary(productId: Int): ReviewSummaryResponse {
         val cacheKey = CacheKeys.reviewSummary(productId)
         cacheService.getJson<ReviewSummaryResponse>(cacheKey)?.let {
@@ -474,7 +479,8 @@ class ReviewService(
         return response
     }
 
-    // 공통 보조
+    // =====  공통 보조 =====
+
     private suspend fun invalidateReviewCaches(reviewId: Int, productId: Int) {
         cacheService.delete(CacheKeys.review(reviewId))
         cacheService.deletePattern(CacheKeys.Patterns.reviews(productId))
@@ -499,7 +505,7 @@ class ReviewService(
         }
     }
 
-    private suspend fun verifyReviewOwnership(
+    private suspend fun requireOwnedReview(
         reviewId: Int,
         userId: Int,
         errorMessage: String

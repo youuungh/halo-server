@@ -12,7 +12,7 @@ data class CartRow(
 
 interface CartRepository {
 
-    // 장바구니 생성/수정/삭제
+    // 장바구니 생성·수정·삭제
     suspend fun createCartItem(userId: Int, productId: Int, quantity: Int): CartDao
     suspend fun updateCartItemQuantity(cartId: Int, quantity: Int): CartDao?
     suspend fun deleteCartItem(cartId: Int): Boolean

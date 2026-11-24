@@ -33,8 +33,8 @@ import com.ninezero.features.chat.presentation.models.response.MessageResponse
 import com.ninezero.features.chat.presentation.models.response.SearchMessageListResponse
 import com.ninezero.features.chat.toMessageResponse
 import com.ninezero.features.commerce.data.ProductRepository
-import com.ninezero.features.commerce.domain.ProductService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.commerce.domain.ProductAccessService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.data.PostRepository
 import com.ninezero.features.social.domain.PostService
@@ -56,8 +56,8 @@ class MessageService(
     private val postRepository: PostRepository,
     private val blockedUserRepository: BlockedUserRepository,
     private val postService: PostService,
-    private val productService: ProductService,
-    private val notificationService: NotificationService,
+    private val productAccessService: ProductAccessService,
+    private val notificationSender: NotificationSender,
     private val mediaUploadService: MediaUploadService,
     private val webSocketManager: WebSocketManager,
     private val fileUploadService: FileUploadService,
@@ -73,7 +73,7 @@ class MessageService(
         currentUserId: Int,
         request: SendMessageRequest
     ): MessageResponse {
-        ValidationUtils.validateClientTempId(request.clientTempId)
+        ChatValidation.validateClientTempId(request.clientTempId)
 
         // 영상·파일은 직접 업로드한 파일로만
         val uploadPurpose = when (request.chatMessageType) {
@@ -94,7 +94,7 @@ class MessageService(
         if (request.chatMessageType == ChatMessageType.IMAGE && request.mediaAttachments.isNullOrEmpty()) {
             throw InvalidInputException(Errors.File.NO_IMAGE_FILES)
         }
-        ValidationUtils.validateChatMessage(
+        ChatValidation.validateChatMessage(
             request.content,
             request.mediaAttachments.orEmpty().size + (if (uploadId != null) 1 else 0)
         )
@@ -194,7 +194,7 @@ class MessageService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendChatMessageNotification(receiverId, currentUserId, roomId, messagePreview)
+                notificationSender.sendChatMessageNotification(receiverId, currentUserId, roomId, messagePreview)
             } catch (e: Exception) {
                 logger.error("채팅 알림 전송 실패: roomId=$roomId, error=${e.message}", e)
             }
@@ -413,7 +413,7 @@ class MessageService(
         page: Int = 1,
         limit: Int = Constants.DEFAULT_PAGE_LIMIT
     ): SearchMessageListResponse {
-        ValidationUtils.validateMessageSearchQuery(query)
+        ChatValidation.validateMessageSearchQuery(query)
 
         val (validPage, validLimit) = validatePaginationParams(page, limit)
 
@@ -469,7 +469,7 @@ class MessageService(
             productRepository.findProductsByIds(productIds)
                 .associateBy { it.id.value }
         } else emptyMap()
-        val accessMap = productService.getProductAccessMap(currentUserId, productMap.values)
+        val accessMap = productAccessService.getAccessMap(currentUserId, productMap.values)
         val blockRelatedUserIds = blockedUserRepository.findBlockRelatedUserIds(currentUserId)
 
         val postIds = messages.mapNotNull { it.postId }.toSet()

@@ -9,7 +9,7 @@ import com.ninezero.core.database.entities.social.LikeDao
 import com.ninezero.core.database.entities.social.PostDao
 import com.ninezero.core.database.entities.upload.MediaDraftDao
 import com.ninezero.core.database.entities.user.UserDao
-import com.ninezero.core.security.PasswordManager
+import com.ninezero.core.security.PasswordHasher
 import com.ninezero.features.commerce.data.BillingKeyRepositoryImpl
 import com.ninezero.features.commerce.data.CartRepositoryImpl
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
@@ -53,7 +53,7 @@ object TestFixtures {
             UserDao.new {
                 this.email = email
                 this.username = username
-                this.passwordHash = PasswordManager.hashPassword(password)
+                this.passwordHash = PasswordHasher.hashPassword(password)
                 this.role = role
             }
         }

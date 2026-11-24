@@ -44,19 +44,19 @@ class ReportRepositoryImpl : ReportRepository {
         page: Int,
         limit: Int
     ): List<ReportedTargetRow> {
-        val countCol = ReportTable.id.count()
+        val countColumn = ReportTable.id.count()
         return ReportTable
-            .select(ReportTable.targetType, ReportTable.targetId, countCol)
+            .select(ReportTable.targetType, ReportTable.targetId, countColumn)
             .apply { targetType?.let { where { ReportTable.targetType eq it } } }  // null이면 전체
             .groupBy(ReportTable.targetType, ReportTable.targetId)
             // 신고 많은 순, 동수는 targetId 보조정렬
-            .orderBy(countCol to SortOrder.DESC, ReportTable.targetId to SortOrder.DESC)
+            .orderBy(countColumn to SortOrder.DESC, ReportTable.targetId to SortOrder.DESC)
             .limit(limit).offset(page.toOffset(limit))
             .map {
                 ReportedTargetRow(
                     targetType = it[ReportTable.targetType],
                     targetId = it[ReportTable.targetId],
-                    reportCount = it[countCol].toInt()
+                    reportCount = it[countColumn].toInt()
                 )
             }
     }

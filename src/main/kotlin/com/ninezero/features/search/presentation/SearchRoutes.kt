@@ -27,14 +27,7 @@ fun Route.searchRoutes() {
                         description = "검색 키워드"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<Boolean>("saveHistory") {
                         description = "검색 기록 저장 여부 (기본값: true). 디바운스 라이브 검색은 false로 호출"
                         required = false
@@ -94,14 +87,7 @@ fun Route.searchRoutes() {
                 summary = "검색 기록 조회"
                 tags("Search")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
             }) {

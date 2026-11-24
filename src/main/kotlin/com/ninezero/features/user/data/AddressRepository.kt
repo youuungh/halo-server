@@ -8,7 +8,7 @@ interface AddressRepository {
     suspend fun findAddresses(userId: Int): List<UserAddressDao>
     suspend fun findAddress(id: Int, userId: Int): UserAddressDao?
 
-    // 배송지 생성/수정
+    // 배송지 생성·수정
     suspend fun createAddress(
         userId: Int,
         recipientName: String,

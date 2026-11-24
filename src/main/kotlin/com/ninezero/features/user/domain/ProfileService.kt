@@ -7,7 +7,6 @@ import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.exception.InvalidImageUrlException
 import com.ninezero.core.common.exception.NotFoundException
 import com.ninezero.core.common.exception.UserNotFoundException
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.user.UserProfileDao
 import com.ninezero.core.database.entities.user.UserProfileTable
@@ -122,16 +121,16 @@ class ProfileService(
     }
 
     suspend fun updateProfile(userId: Int, request: UpdateProfileRequest): ProfileResponse {
-        ValidationUtils.validateDisplayName(request.displayName)
-        ValidationUtils.validateBio(request.bio)
-        ValidationUtils.validateLocation(request.location)
-        ValidationUtils.validateWebsite(request.website)
+        UserValidation.validateDisplayName(request.displayName)
+        UserValidation.validateBio(request.bio)
+        UserValidation.validateLocation(request.location)
+        UserValidation.validateWebsite(request.website)
 
         // null은 그대로 두고 빈 값은 지움
         val displayName = request.displayName?.trim()
         val bio = request.bio?.trim()?.ifEmpty { null }
         val location = request.location?.trim()?.ifEmpty { null }
-        val website = request.website?.let { ValidationUtils.sanitizeUrl(it) }
+        val website = request.website?.let { UserValidation.sanitizeUrl(it) }
 
         val response = query {
             val user = userRepository.findUserById(userId)

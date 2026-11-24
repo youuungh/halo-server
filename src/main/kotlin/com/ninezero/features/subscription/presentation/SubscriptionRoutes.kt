@@ -11,6 +11,7 @@ import com.ninezero.core.common.util.getOptionalEnumParam
 import com.ninezero.core.common.util.getOptionalStringParam
 import com.ninezero.core.common.util.getRequiredBooleanParam
 import com.ninezero.core.common.util.getRequiredIntParam
+import com.ninezero.core.common.util.pageParams
 import com.ninezero.core.common.util.requireUserId
 import com.ninezero.features.subscription.domain.SubscriptionPaymentService
 import com.ninezero.features.subscription.domain.SubscriptionService
@@ -165,14 +166,7 @@ fun Route.subscriptionRoutes() {
                             value = "ACTIVE"
                         }
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {
@@ -197,14 +191,7 @@ fun Route.subscriptionRoutes() {
                 summary = "내 구독자 목록 조회 (Creator)"
                 tags("Subscriptions")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("search") {
                         description = "검색어 (username, displayName 대소문자 무시 부분 일치)"
                         required = false

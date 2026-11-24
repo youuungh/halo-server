@@ -4,6 +4,7 @@ import com.ninezero.core.common.config.ChatMessageType
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.InvalidFileException
 import com.ninezero.core.common.util.*
 import com.ninezero.core.storage.StorageConfig
 import com.ninezero.features.chat.domain.MessageService
@@ -130,7 +131,7 @@ fun Route.messageRoutes() {
                     val (images, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.CHAT_IMAGE)
 
                     if (images.isEmpty()) {
-                        return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES))
+                        throw InvalidFileException(Errors.File.NO_IMAGE_FILES)
                     }
 
                     val uploaded = messageService.uploadChatImages(roomId, userId, images)
@@ -293,14 +294,7 @@ fun Route.messageRoutes() {
                         description = "검색 키워드"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {

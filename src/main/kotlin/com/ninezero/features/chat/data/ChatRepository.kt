@@ -5,7 +5,7 @@ import com.ninezero.core.database.entities.chat.ChatRoomDao
 
 interface ChatRepository {
 
-    // 채팅방 생성/수정
+    // 채팅방 생성·수정
     suspend fun getOrCreateChatRoom(userId1: Int, userId2: Int): ChatRoomDao
     suspend fun updateChatRoom(
         roomId: Int,

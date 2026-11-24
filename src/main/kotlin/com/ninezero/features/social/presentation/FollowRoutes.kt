@@ -31,14 +31,7 @@ fun Route.followRoutes() {
                         description = "대상 사용자 ID"
                         required = true
                     }
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("search") {
                         description = "검색어 (username, displayName 대소문자 무시 부분 일치)"
                         required = false
@@ -66,14 +59,7 @@ fun Route.followRoutes() {
                         description = "대상 사용자 ID"
                         required = true
                     }
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("search") {
                         description = "검색어 (username, displayName 대소문자 무시 부분 일치)"
                         required = false
@@ -169,14 +155,7 @@ fun Route.followRoutes() {
                 summary = "내 팔로워 목록 조회"
                 tags("Follows")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("search") {
                         description = "검색어 (username, displayName 대소문자 무시 부분 일치)"
                         required = false
@@ -198,14 +177,7 @@ fun Route.followRoutes() {
                 summary = "내 팔로잉 목록 조회"
                 tags("Follows")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("search") {
                         description = "검색어 (username, displayName 대소문자 무시 부분 일치)"
                         required = false
@@ -228,14 +200,7 @@ fun Route.followRoutes() {
                 tags("Follows")
                 description = "알림 설정 포함"
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
             }) {

@@ -47,6 +47,7 @@ import com.ninezero.features.user.data.SocialAccountRepositoryImpl
 import com.ninezero.features.user.data.UserRepositoryImpl
 import com.ninezero.features.user.data.UserSessionRepositoryImpl
 import com.ninezero.features.user.domain.AuthService
+import com.ninezero.features.user.domain.UserSessionService
 import com.ninezero.features.user.presentation.models.request.ChangePasswordRequest
 import com.ninezero.features.user.presentation.models.request.LoginRequest
 import com.ninezero.features.user.presentation.models.request.RegisterRequest
@@ -59,13 +60,13 @@ import com.ninezero.helper.TestFixtures.plusDays
 import io.mockk.clearMocks
 import io.mockk.coVerify
 import io.mockk.mockk
-import java.math.BigDecimal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.v1.core.eq
 import org.junit.jupiter.api.*
+import java.math.BigDecimal
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -135,7 +136,7 @@ class AccountManagementTest {
             val pointService = PointService(
                 pointRepository = pointRepository,
                 pointHistoryRepository = pointHistoryRepository,
-                notificationService = mockk(relaxed = true),
+                notificationSender = mockk(relaxed = true),
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
 
@@ -145,13 +146,18 @@ class AccountManagementTest {
                 refreshTokenRepository = refreshTokenRepository,
                 emailService = mockk<EmailService>(relaxed = true),
                 pointService = pointService,
-                coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
                 socialAccountRepository = socialAccountRepository,
-                socialTokenVerifiers = emptyList(),
                 fileUploadService = fileUploadService,
                 cacheService = CacheService(),
                 accountCleanupService = TestFixtures.accountCleanupService(),
-                webSocketManager = mockk(relaxed = true)
+                webSocketManager = mockk(relaxed = true),
+                userSessionService = UserSessionService(
+                    userSessionRepository = userSessionRepository,
+                    userRepository = userRepository,
+                    refreshTokenRepository = refreshTokenRepository,
+                    webSocketManager = mockk(relaxed = true),
+                    coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+                )
             )
         }
     }
@@ -268,7 +274,7 @@ class AccountManagementTest {
             // B는 기기 목록과 푸시 대상에서도 빠짐
             query {
                 assertEquals(listOf("device-A"), userSessionRepository.findUserSessions(user.id.value).map { it.deviceId })
-                assertFalse("fid-B" in userRepository.getDeviceFidsForUser(user.id.value))
+                assertFalse("fid-B" in userRepository.findDeviceFidsForUser(user.id.value))
             }
         }
     }
@@ -630,7 +636,7 @@ class AccountManagementTest {
                 )
             }
 
-            val fids = query { userRepository.getDeviceFidsForUser(user.id.value) }
+            val fids = query { userRepository.findDeviceFidsForUser(user.id.value) }
             assertFalse("fid-1" in fids, "밀려난 기기 토큰이 남음: $fids")
             assertEquals(Constants.User.MAX_ACTIVE_SESSIONS, fids.size)
         }

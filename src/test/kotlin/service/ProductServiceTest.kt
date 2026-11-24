@@ -13,12 +13,13 @@ import com.ninezero.core.database.entities.upload.MediaDraftDao
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
+import com.ninezero.features.commerce.domain.ProductAccessService
 import com.ninezero.features.commerce.domain.ProductService
 import com.ninezero.features.commerce.presentation.models.DetailContentBlock
 import com.ninezero.features.commerce.presentation.models.request.ProductImageRef
 import com.ninezero.features.commerce.presentation.models.request.ProductRequest
 import com.ninezero.features.commerce.presentation.models.request.UpdateProductRequest
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionPlanRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionRepositoryImpl
@@ -52,7 +53,7 @@ class ProductServiceTest {
     private lateinit var tagRepository: TagRepositoryImpl
     private lateinit var subscriptionRepository: SubscriptionRepositoryImpl
     private lateinit var planRepository: SubscriptionPlanRepositoryImpl
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
     private lateinit var cacheService: CacheService
@@ -70,7 +71,7 @@ class ProductServiceTest {
             planRepository = SubscriptionPlanRepositoryImpl()
 
             // Mock 객체 생성
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             fileUploadService = mockk(relaxed = true)
             imageProcessingService = mockk(relaxed = true)
             cacheService = mockk(relaxed = true)
@@ -92,9 +93,9 @@ class ProductServiceTest {
                 userRepository = userRepository,
                 followRepository = followRepository,
                 tagRepository = tagRepository,
-                subscriptionRepository = subscriptionRepository,
                 planRepository = planRepository,
-                notificationService = notificationService,
+                productAccessService = ProductAccessService(subscriptionRepository),
+                notificationSender = notificationSender,
                 mediaDraftService = MediaDraftService(
                     mediaDraftRepository = MediaDraftRepositoryImpl(),
                     mediaUploadService = mockk(relaxed = true),

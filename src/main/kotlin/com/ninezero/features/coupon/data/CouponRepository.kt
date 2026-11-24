@@ -9,7 +9,7 @@ import java.math.BigDecimal
 
 interface CouponRepository {
 
-    // 쿠폰 생성/수정/삭제
+    // 쿠폰 생성·수정·삭제
     suspend fun create(
         creatorId: Int,
         code: String,

@@ -72,7 +72,7 @@ interface ProductRepository {
     ): ProductDao?
     suspend fun updateProductStatus(productId: Int, status: ProductStatus): ProductDao?
 
-    // 크리에이터 해제/탈퇴 정리
+    // 크리에이터 해제·탈퇴 정리
     suspend fun discontinueProductsByCreator(creatorId: Int): List<Int>
 
     suspend fun softDeleteProductsByCreator(creatorId: Int): List<SoftDeletedProduct>

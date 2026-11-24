@@ -9,12 +9,12 @@ import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.VideoProcessingService
 import com.ninezero.core.websocket.WebSocketManager
-import com.ninezero.features.admin.adminModule
 import com.ninezero.features.banner.bannerModule
 import com.ninezero.features.share.shareModule
 import com.ninezero.features.chat.chatModule
 import com.ninezero.features.commerce.commerceModule
 import com.ninezero.features.coupon.couponModule
+import com.ninezero.features.monitoring.monitoringModule
 import com.ninezero.features.notification.notificationModule
 import com.ninezero.features.point.pointModule
 import com.ninezero.features.search.searchModule
@@ -65,6 +65,6 @@ val appModules: List<Module> = listOf(
     bannerModule,
     pointModule,
     couponModule,
-    adminModule,
+    monitoringModule,
     uploadModule
 )

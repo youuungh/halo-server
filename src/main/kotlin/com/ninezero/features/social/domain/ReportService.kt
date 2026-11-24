@@ -67,7 +67,7 @@ class ReportService(
         return result
     }
 
-    suspend fun findReportedTargets(
+    suspend fun getReportedTargets(
         targetType: ReportTargetType?,
         page: Int,
         limit: Int
@@ -104,7 +104,7 @@ class ReportService(
     }
 
     /** 관리자 전용 대상 상세 */
-    suspend fun findReportedTargetDetail(
+    suspend fun getReportedTargetDetail(
         targetType: ReportTargetType,
         targetId: Int
     ): ReportedTargetDetailResponse = query {

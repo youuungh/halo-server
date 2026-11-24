@@ -4,8 +4,6 @@ import com.ninezero.core.common.config.*
 import com.ninezero.core.common.exception.*
 import com.ninezero.core.common.util.*
 import com.ninezero.core.database.entities.commerce.ProductDao
-import com.ninezero.core.database.entities.subscription.SubscriptionDao
-import com.ninezero.core.database.entities.subscription.SubscriptionPlanDao
 import com.ninezero.features.commerce.data.CartRepository
 import com.ninezero.features.commerce.data.ProductRepository
 import com.ninezero.features.commerce.data.WishlistRepository
@@ -15,8 +13,6 @@ import com.ninezero.features.commerce.presentation.models.response.WishlistProdu
 import com.ninezero.features.commerce.presentation.models.response.WishlistStatusResponse
 import com.ninezero.features.commerce.presentation.models.response.WishlistToggleResponse
 import com.ninezero.features.commerce.toWishlistResponse
-import com.ninezero.features.subscription.data.SubscriptionPlanRepository
-import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.toUserSummaryResponse
 import java.math.RoundingMode
 
@@ -24,8 +20,7 @@ class WishlistService(
     private val wishlistRepository: WishlistRepository,
     private val productRepository: ProductRepository,
     private val cartRepository: CartRepository,
-    private val subscriptionRepository: SubscriptionRepository,
-    private val planRepository: SubscriptionPlanRepository
+    private val productAccessService: ProductAccessService
 ) {
 
     suspend fun toggleWishlist(userId: Int, productId: Int): WishlistToggleResponse {
@@ -57,7 +52,7 @@ class WishlistService(
         return query {
             val (wishlists, nextCursor) = wishlistRepository.findWishlistWithProducts(userId, pageCursor, validLimit + 1)
                 .toCursorPage(validLimit) { PageCursor.of(it.wishlist.createdAt, it.wishlist.id.value) }
-            val accessMap = buildProductAccessMap(userId, wishlists.map { it.product })
+            val accessMap = productAccessService.getAccessMap(userId, wishlists.map { it.product })
 
             val responses = wishlists.map { wishlistWithProduct ->
                 val creatorSummary = wishlistWithProduct.creator.toUserSummaryResponse()
@@ -109,7 +104,7 @@ class WishlistService(
                 throw NotFoundException(Errors.Commerce.Wishlist.WISHLIST_ITEM_NOT_FOUND)
             }
 
-            val canAccess = canAccessProduct(userId, product)
+            val canAccess = productAccessService.canAccess(userId, product)
             when (resolvePurchaseState(product, canAccess)) {
                 PurchaseState.NO_ACCESS ->
                     throw ForbiddenException(Errors.Commerce.Product.PRODUCT_ACCESS_DENIED)
@@ -125,8 +120,8 @@ class WishlistService(
                 throw InvalidInputException(Errors.Commerce.Cart.CANNOT_BUY_OWN_PRODUCT)
             }
             val cartQuantity = (cartRepository.findCartItem(userId, productId)?.quantity ?: 0) + 1
-            ValidationUtils.validateCartQuantity(cartQuantity)
-            ValidationUtils.validateStockAvailability(product.stock, cartQuantity)
+            CommerceValidation.validateCartQuantity(cartQuantity)
+            CommerceValidation.validateStockAvailability(product.stock, cartQuantity)
 
             cartRepository.createCartItem(userId, productId, 1)
 
@@ -137,55 +132,6 @@ class WishlistService(
         }
 
         return Messages.Commerce.WISHLIST_MOVED_TO_CART
-    }
-
-    private suspend fun buildProductAccessMap(userId: Int, products: List<ProductDao>): Map<Int, Boolean> {
-        if (products.isEmpty()) return emptyMap()
-
-        val creatorIds = products.map { it.creatorId }.distinct()
-        val subscriptions = subscriptionRepository.findActiveSubscriptionsByCreators(userId, creatorIds)
-        val subscriptionMap = subscriptions.associateBy { it.creatorId }
-
-        val planIds = subscriptions.map { it.planId }.distinct()
-        val planMap = planRepository.findPlansByIds(planIds).associateBy { it.id.value }
-
-        return products.associate { product ->
-            product.id.value to canAccessProduct(userId, product, subscriptionMap, planMap)
-        }
-    }
-
-    private fun canAccessProduct(
-        userId: Int,
-        product: ProductDao,
-        subscriptionMap: Map<Int, SubscriptionDao>,
-        planMap: Map<Int, SubscriptionPlanDao>
-    ): Boolean {
-        val viewerTier = subscriptionMap[product.creatorId]?.let { planMap[it.planId]?.tier }
-        return TierAccessEvaluator.canAccess(
-            viewerId = userId,
-            ownerId = product.creatorId,
-            creatorId = product.creatorId,
-            requiredTier = product.requiredTier,
-            isSecret = false,
-            viewerTier = viewerTier
-        )
-    }
-
-    private suspend fun canAccessProduct(userId: Int, product: ProductDao): Boolean {
-        // 티어 잠금 상품만 구독 조회 후 판정 위임
-        val viewerTier = if (product.creatorId != userId && product.requiredTier != SubscriptionPlanTier.FREE) {
-            subscriptionRepository.findActiveSubscription(userId, product.creatorId)
-                ?.let { planRepository.findPlanById(it.planId)?.tier }
-        } else null
-
-        return TierAccessEvaluator.canAccess(
-            viewerId = userId,
-            ownerId = product.creatorId,
-            creatorId = product.creatorId,
-            requiredTier = product.requiredTier,
-            isSecret = false,
-            viewerTier = viewerTier
-        )
     }
 
     private fun resolvePurchaseState(product: ProductDao, canAccess: Boolean): PurchaseState {

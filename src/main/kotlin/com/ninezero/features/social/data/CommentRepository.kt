@@ -8,7 +8,7 @@ import com.ninezero.core.database.entities.social.CommentDao
 
 interface CommentRepository {
 
-    // 댓글 생성/수정/삭제
+    // 댓글 생성·수정·삭제
     suspend fun createComment(
         userId: Int,
         postId: Int,
@@ -55,7 +55,7 @@ interface CommentRepository {
     suspend fun countCommentsByPostId(postId: Int, viewerId: Int?): Int
     suspend fun countRepliesByCommentId(commentId: Int, viewerId: Int?): Int
 
-    // 좋아요/답글 수 수정
+    // 좋아요·답글 수 수정
     suspend fun incrementLikeCount(commentId: Int): Boolean
     suspend fun decrementLikeCount(commentId: Int): Boolean
     suspend fun incrementRepliesCount(commentId: Int): Boolean

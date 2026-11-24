@@ -6,7 +6,7 @@ import com.ninezero.core.database.entities.social.LikeDao
 
 interface LikeRepository {
 
-    // 좋아요 생성/삭제
+    // 좋아요 생성·삭제
     suspend fun createLike(userId: Int, targetType: LikeType, targetId: Int): LikeDao?
     suspend fun deleteLike(userId: Int, targetType: LikeType, targetId: Int): Boolean
 

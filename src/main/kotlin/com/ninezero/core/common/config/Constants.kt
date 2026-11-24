@@ -123,14 +123,14 @@ object Constants {
         // 비밀번호 재설정 코드
         const val RESET_CODE_VALIDITY_MINUTES = 5
         const val RESET_CODE_MAX_ATTEMPTS = 5
-        const val RESET_CODE_RESEND_COOLDOWN_SECONDS = 60
+        const val RESET_CODE_RESEND_WAIT_SECONDS = 60
         const val RESET_CODE_MAX_SENDS_PER_HOUR = 5
         const val RESET_TOKEN_VALIDITY_MINUTES = 10
 
         // 회원가입 인증 코드
         const val SIGNUP_CODE_VALIDITY_MINUTES = 5
         const val SIGNUP_CODE_MAX_ATTEMPTS = 5
-        const val SIGNUP_CODE_RESEND_COOLDOWN_SECONDS = 60
+        const val SIGNUP_CODE_RESEND_WAIT_SECONDS = 60
         const val SIGNUP_CODE_MAX_SENDS_PER_HOUR = 5
 
         // 대기 가입 보관 시간
@@ -141,7 +141,7 @@ object Constants {
         const val MAX_CREATOR_APPLICATION_REASON_LENGTH = 300
         const val MIN_REJECTION_REASON_LENGTH = 10
         const val MAX_REJECTION_REASON_LENGTH = 300
-        const val CREATOR_REAPPLY_COOLDOWN_DAYS = 7
+        const val CREATOR_REAPPLY_WAIT_DAYS = 7
     }
 
     object Address {

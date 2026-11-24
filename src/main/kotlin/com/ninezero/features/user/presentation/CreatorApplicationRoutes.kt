@@ -119,7 +119,7 @@ fun Route.creatorApplicationRoutes() {
             }) {
                 val userId = call.requireUserId() ?: return@post
 
-                val response = creatorApplicationService.revokeSelf(userId)
+                val response = creatorApplicationService.leaveCreator(userId)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
         }
@@ -140,14 +140,7 @@ fun Route.creatorApplicationRoutes() {
                             value = "PENDING"
                         }
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("search") {
                         description = "검색어 (사용자명)"
                         required = false

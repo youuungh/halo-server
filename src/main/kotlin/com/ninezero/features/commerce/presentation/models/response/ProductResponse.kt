@@ -18,12 +18,12 @@ data class ProductResponse(
     val price: String,
     val originalPrice: String? = null,
     val discountRate: Int? = null,
-    // 타임딜 override
+    /** 타임딜 override */
     val dealPrice: String? = null,
     val dealStartAt: LocalDateTime? = null,
     val dealEndAt: LocalDateTime? = null,
     val isDealActive: Boolean = false,
-    // prefill용 원본값
+    /** prefill용 원본값 */
     val basePrice: String,
     val baseOriginalPrice: String? = null,
     val stock: Int,

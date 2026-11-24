@@ -22,14 +22,7 @@ fun Route.feedRoutes() {
                 tags("Feed")
                 description = "인기 게시글"
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
             }) {
@@ -51,14 +44,7 @@ fun Route.feedRoutes() {
                 tags("Feed")
                 description = "지금 뜨는 게시글"
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
             }) {
@@ -83,14 +69,7 @@ fun Route.feedRoutes() {
                         description = "해시태그 (# 제외)"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
             }) {
@@ -117,14 +96,7 @@ fun Route.feedRoutes() {
                 tags("Feed")
                 description = "팔로우한 사용자의 게시글"
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
             }) {

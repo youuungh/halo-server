@@ -20,7 +20,7 @@ import com.ninezero.core.common.util.query
 import com.ninezero.features.commerce.data.OrderRepositoryImpl
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
 import com.ninezero.features.coupon.data.CouponRepositoryImpl
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.PostRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionPlanRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionRepositoryImpl
@@ -55,7 +55,7 @@ class CreatorApplicationServiceTest {
     private lateinit var applicationService: CreatorApplicationService
     private lateinit var applicationRepository: CreatorApplicationRepositoryImpl
     private lateinit var userRepository: UserRepositoryImpl
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var subscriptionRepository: SubscriptionRepositoryImpl
     private lateinit var orderRepository: OrderRepositoryImpl
     private lateinit var planRepository: SubscriptionPlanRepositoryImpl
@@ -79,26 +79,26 @@ class CreatorApplicationServiceTest {
             couponRepository = CouponRepositoryImpl()
 
             // Mock 객체 생성
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             cacheService = mockk(relaxed = true)
 
             // Mock 동작 정의
             coEvery {
-                notificationService.sendCreatorApprovedNotification(any(), any())
+                notificationSender.sendCreatorApprovedNotification(any(), any())
             } returns mockk()
 
             coEvery {
-                notificationService.sendCreatorRejectedNotification(any(), any(), any())
+                notificationSender.sendCreatorRejectedNotification(any(), any(), any())
             } returns mockk()
 
             coEvery {
-                notificationService.sendCreatorDemotedNotification(any(), any())
+                notificationSender.sendCreatorDemotedNotification(any(), any())
             } returns mockk()
 
             applicationService = CreatorApplicationService(
                 applicationRepository = applicationRepository,
                 userRepository = userRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
                 subscriptionRepository = subscriptionRepository,
                 orderRepository = orderRepository,
@@ -116,7 +116,7 @@ class CreatorApplicationServiceTest {
         runBlocking {
             TestDatabase.clearAll()
             // 알림 호출 기록 초기화 (스텁 유지) — 테스트 간 coVerify 오염 방지
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
         }
     }
 
@@ -345,7 +345,7 @@ class CreatorApplicationServiceTest {
             )
 
             coVerify {
-                notificationService.sendCreatorRejectedNotification(
+                notificationSender.sendCreatorRejectedNotification(
                     user.id.value,
                     application.id,
                     "사유가 불충분합니다. 사유가 불충분합니다."
@@ -532,7 +532,7 @@ class CreatorApplicationServiceTest {
             )
 
             // 셀프 해제
-            val message = applicationService.revokeSelf(user.id.value)
+            val message = applicationService.leaveCreator(user.id.value)
             assertEquals("크리에이터가 해제되었습니다.", message)
 
             query {
@@ -568,7 +568,7 @@ class CreatorApplicationServiceTest {
             }
 
             // 본인 액션 — 강등 알림 미발송
-            coVerify(exactly = 0) { notificationService.sendCreatorDemotedNotification(any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendCreatorDemotedNotification(any(), any()) }
         }
     }
 
@@ -600,7 +600,7 @@ class CreatorApplicationServiceTest {
             }
 
             val exception = assertFailsWith<ValidationException> {
-                applicationService.revokeSelf(creator.id.value)
+                applicationService.leaveCreator(creator.id.value)
             }
             assertTrue(exception.message!!.contains("활성 구독자 1명"))
 
@@ -622,7 +622,7 @@ class CreatorApplicationServiceTest {
             TestFixtures.createTestOrder(userId = buyer.id.value, productId = product.id.value)
 
             val exception = assertFailsWith<ValidationException> {
-                applicationService.revokeSelf(creator.id.value)
+                applicationService.leaveCreator(creator.id.value)
             }
             assertTrue(exception.message!!.contains("진행 중 주문 1건"))
 
@@ -638,7 +638,7 @@ class CreatorApplicationServiceTest {
             val user = TestFixtures.createTestUser(role = UserRole.USER)
 
             assertFailsWith<ValidationException> {
-                applicationService.revokeSelf(user.id.value)
+                applicationService.leaveCreator(user.id.value)
             }
         }
     }
@@ -674,7 +674,7 @@ class CreatorApplicationServiceTest {
             }
 
             // 관리자 강등은 알림 발송
-            coVerify(exactly = 1) { notificationService.sendCreatorDemotedNotification(creator.id.value, any()) }
+            coVerify(exactly = 1) { notificationSender.sendCreatorDemotedNotification(creator.id.value, any()) }
         }
     }
 
@@ -706,7 +706,7 @@ class CreatorApplicationServiceTest {
             val product = TestFixtures.createTestProduct(creatorId = user.id.value)
 
             // 셀프 해제
-            applicationService.revokeSelf(user.id.value)
+            applicationService.leaveCreator(user.id.value)
 
             // 재신청은 7일 쿨다운에 걸리므로 repository로 직접 신청 생성 후 승인
             val reApplication = query {

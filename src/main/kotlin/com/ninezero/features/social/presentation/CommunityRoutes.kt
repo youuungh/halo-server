@@ -33,14 +33,7 @@ fun Route.communityRoutes() {
                         description = "크리에이터 ID"
                         required = true
                     }
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("sort") {
                         description = "정렬 방식: LATEST (최신순, 기본값), POPULAR (좋아요순), MOST_VIEWED (조회수순), OLDEST (오래된순)"
                         required = false

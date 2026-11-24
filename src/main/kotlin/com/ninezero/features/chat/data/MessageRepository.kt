@@ -13,7 +13,7 @@ data class MessageReadInfo(
 
 interface MessageRepository {
 
-    // 메시지 생성/삭제
+    // 메시지 생성·삭제
     suspend fun createMessage(
         roomId: Int,
         senderId: Int,

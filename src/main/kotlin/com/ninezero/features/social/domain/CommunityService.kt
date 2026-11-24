@@ -62,15 +62,16 @@ class CommunityService(
     private val cacheService: CacheService,
     private val coroutineScope: CoroutineScope
 ) {
-    // 커뮤니티 글 생성·수정·삭제
+    // =====  커뮤니티 글 생성·수정·삭제 =====
+
     suspend fun createCommunityPost(
         userId: Int,
         creatorId: Int,
         request: CommunityPostRequest
     ): PostResponse {
         val content = request.content.trim()
-        ValidationUtils.validatePostContent(content)
-        ValidationUtils.validateClientRequestId(request.clientRequestId)
+        SocialValidation.validatePostContent(content)
+        SocialValidation.validateClientRequestId(request.clientRequestId)
         val extractedTags = extractHashtags(content)
 
         // 같은 요청이 반복되면 만든 글을 그대로
@@ -130,7 +131,7 @@ class CommunityService(
         request: CommunityPostRequest
     ): PostResponse {
         val content = request.content.trim()
-        ValidationUtils.validatePostContent(content)
+        SocialValidation.validatePostContent(content)
         val extractedTags = extractHashtags(content)
 
         val (response, targetCreatorId) = query {
@@ -199,7 +200,8 @@ class CommunityService(
         cacheService.invalidatePostCaches(postId, authorId, communityCreatorId = targetCreatorId)  // 크리에이터가 지워도 글 수는 작성자 프로필
     }
 
-    // 커뮤니티 글 조회
+    // =====  커뮤니티 글 조회 =====
+
     suspend fun getCommunityPosts(
         creatorId: Int,
         currentUserId: Int?,
@@ -269,21 +271,7 @@ class CommunityService(
                 emptyMap()
             }
 
-            val accessMap = if (currentUserId != null) {
-                postService.checkMultiplePostAccess(currentUserId, allPosts)
-            } else {
-                // 비회원도 비밀글·티어 잠금 판정
-                allPosts.associate {
-                    it.id.value to TierAccessEvaluator.canAccess(
-                        viewerId = null,
-                        ownerId = it.userId,
-                        creatorId = it.creatorId,
-                        requiredTier = it.requiredTier,
-                        isSecret = it.isSecret,
-                        viewerTier = null
-                    )
-                }
-            }
+            val accessMap = postService.checkMultiplePostAccess(currentUserId, allPosts)  // 비회원도 비밀글·티어 잠금 판정
 
             val postMediaMap = batchLoadPostMediaItems(allPosts.map { it.id.value })
 
@@ -314,7 +302,8 @@ class CommunityService(
         return response
     }
 
-    // 공지 고정
+    // =====  공지 고정 =====
+
     suspend fun togglePinCommunityPost(postId: Int, creatorId: Int): PinToggleResponse {
         val isPinned = query {
             val user = userRepository.findUserById(creatorId)
@@ -356,7 +345,8 @@ class CommunityService(
         return PinToggleResponse(isPinned = isPinned)
     }
 
-    // 커뮤니티 미디어
+    // =====  커뮤니티 미디어 =====
+
     suspend fun updateCommunityWithMedia(
         postId: Int,
         userId: Int,

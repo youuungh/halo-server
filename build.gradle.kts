@@ -62,8 +62,8 @@ dependencies {
     implementation(libs.logback.classic)
 
     // * 데이터베이스
-    implementation(libs.postgresql)
-    implementation(libs.h2)
+    runtimeOnly(libs.postgresql)
+    runtimeOnly(libs.h2)
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)
     implementation(libs.exposed.dao)
@@ -87,12 +87,12 @@ dependencies {
     implementation(libs.supabase.storage)
 
     // * 이미지 (ImageIO WebP 읽기)
-    implementation(libs.twelvemonkeys.imageio.webp)
+    runtimeOnly(libs.twelvemonkeys.imageio.webp)
 
     // * Redis (Lettuce 코루틴 API)
     implementation(libs.lettuce.core)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.reactive)
+    runtimeOnly(libs.kotlinx.coroutines.reactive)
 
     // * HTTP 클라이언트 (결제·배송·이메일·소셜 로그인)
     implementation(libs.ktor.client.core)

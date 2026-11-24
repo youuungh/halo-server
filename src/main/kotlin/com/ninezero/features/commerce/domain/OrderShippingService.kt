@@ -3,7 +3,6 @@ package com.ninezero.features.commerce.domain
 import com.ninezero.core.common.config.OrderStatus
 import com.ninezero.core.common.config.ShippingStatus
 import com.ninezero.core.common.exception.*
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.common.util.logger
 import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.commerce.OrderDao
@@ -20,7 +19,7 @@ import com.ninezero.features.commerce.presentation.models.request.UpdateShipping
 import com.ninezero.features.commerce.presentation.models.response.OrderResponse
 import com.ninezero.features.commerce.presentation.models.response.ShippingProgressResponse
 import com.ninezero.features.commerce.presentation.models.response.ShippingResponse
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.point.domain.PointEarnService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -34,7 +33,7 @@ class OrderShippingService(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
     private val orderResponseAssembler: OrderResponseAssembler,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val pointEarnService: PointEarnService,
     private val deliveryApiClient: DeliveryApiClient,
     private val coroutineScope: CoroutineScope
@@ -59,15 +58,16 @@ class OrderShippingService(
         val trackingNumber: String
     )
 
-    // 배송 정보·상태
+    // =====  배송 정보·상태 =====
+
     suspend fun updateShippingInfo(
         userId: Int,
         orderId: Int,
         request: UpdateShippingRequest
     ): OrderResponse {
-        val trackingNumber = ValidationUtils.normalizeTrackingNumber(request.trackingNumber)
-        ValidationUtils.validateTrackingNumber(trackingNumber)
-        ValidationUtils.validateCarrier(request.carrier)
+        val trackingNumber = CommerceValidation.normalizeTrackingNumber(request.trackingNumber)
+        CommerceValidation.validateTrackingNumber(trackingNumber)
+        CommerceValidation.validateCarrier(request.carrier)
 
         val (response, buyerId, change) = query {
             val order = lockOrder(orderId)  // 취소와 직렬화
@@ -136,14 +136,14 @@ class OrderShippingService(
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
                 if (change == ShippingInfoChange.CHANGED) {
-                    notificationService.sendTrackingChangedNotification(
+                    notificationSender.sendTrackingChangedNotification(
                         userId = buyerId,
                         orderId = orderId,
                         carrier = request.carrier,
                         trackingNumber = trackingNumber
                     )
                 } else {
-                    notificationService.sendShippingStartedNotification(
+                    notificationSender.sendShippingStartedNotification(
                         userId = buyerId,
                         orderId = orderId,
                         trackingNumber = trackingNumber
@@ -466,20 +466,20 @@ class OrderShippingService(
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
                 when (status) {
-                    ShippingStatus.IN_TRANSIT -> notificationService.sendShippingInTransitNotification(
+                    ShippingStatus.IN_TRANSIT -> notificationSender.sendShippingInTransitNotification(
                         userId = buyerUserId, orderId = orderId, creatorId = creatorId
                     )
 
-                    ShippingStatus.OUT_FOR_DELIVERY -> notificationService.sendOutForDeliveryNotification(
+                    ShippingStatus.OUT_FOR_DELIVERY -> notificationSender.sendOutForDeliveryNotification(
                         userId = buyerUserId, orderId = orderId, creatorId = creatorId
                     )
 
                     ShippingStatus.DELIVERED -> {
-                        notificationService.sendShippingDeliveredNotification(
+                        notificationSender.sendShippingDeliveredNotification(
                             userId = buyerUserId, orderId = orderId, creatorId = creatorId
                         )
                         if (earnedAmount > BigDecimal.ZERO) {
-                            notificationService.sendPointEarnedNotification(userId = buyerUserId, orderId = orderId, amount = earnedAmount)
+                            notificationSender.sendPointEarnedNotification(userId = buyerUserId, orderId = orderId, amount = earnedAmount)
                         }
                     }
 
@@ -491,7 +491,8 @@ class OrderShippingService(
         }
     }
 
-    // 배송 추적
+    // =====  배송 추적 =====
+
     suspend fun retryMissingTrackingSubscriptions(): Int {
         // 키 없으면 등록 불가라 경고 없이 건너뜀
         if (!deliveryApiClient.isEnabled) return 0
@@ -571,13 +572,13 @@ class OrderShippingService(
 
         return if (requestId == null) {
             query {
-                orderRepository.clearTrackingSubId(orderId, creatorId)
+                orderRepository.clearTrackingSubscriptionId(orderId, creatorId)
             }
             logger.warn("배송 추적 구독이 생성되지 않았습니다(1시간마다 재시도): orderId={}", orderId)
             false
         } else {
             query {
-                orderRepository.setTrackingSubId(orderId, creatorId, requestId)
+                orderRepository.setTrackingSubscriptionId(orderId, creatorId, requestId)
             }
             logger.info("배송 추적 구독 생성 완료: orderId={}, requestId={}", orderId, requestId)
             true

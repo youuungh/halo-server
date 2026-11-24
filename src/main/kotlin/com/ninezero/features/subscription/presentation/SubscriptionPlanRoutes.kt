@@ -9,6 +9,7 @@ import com.ninezero.core.common.util.apiResponse
 import com.ninezero.core.common.util.authResponse
 import com.ninezero.core.common.util.getIntParam
 import com.ninezero.core.common.util.getRequiredIntParam
+import com.ninezero.core.common.util.pageParams
 import com.ninezero.core.common.util.requireUserId
 import com.ninezero.features.subscription.domain.SubscriptionPlanService
 import com.ninezero.features.subscription.presentation.models.request.SubscriptionPlanRequest
@@ -38,14 +39,7 @@ fun Route.subscriptionPlanRoutes() {
                     description = "크리에이터 ID"
                     required = true
                 }
-                queryParameter<Int>("page") {
-                    description = "페이지 번호 (기본값: 1)"
-                    required = false
-                }
-                queryParameter<Int>("limit") {
-                    description = "페이지 크기 (기본값: 20)"
-                    required = false
-                }
+                pageParams()
             }
             apiResponse()
             response {
@@ -109,14 +103,7 @@ fun Route.subscriptionPlanRoutes() {
                 summary = "내 플랜 목록 조회 (Creator)"
                 tags("SubscriptionPlans")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {

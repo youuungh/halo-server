@@ -3,6 +3,7 @@ package com.ninezero.features.user.presentation
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.InvalidFileException
 import com.ninezero.core.common.util.*
 import com.ninezero.core.storage.StorageConfig
 import com.ninezero.features.user.domain.ProfileService
@@ -130,13 +131,7 @@ fun Route.profileRoutes() {
 
                     val (files, _) = call.receiveFileParts(StorageConfig.FileSizeLimit.AVATAR)
                     val fileBytes = files.firstOrNull()
-
-                    if (fileBytes == null) {
-                        return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            ApiResponse.error<Unit>(Errors.File.NO_FILE_UPLOADED)
-                        )
-                    }
+                        ?: throw InvalidFileException(Errors.File.NO_FILE_UPLOADED)
 
                     val response = profileService.uploadAvatar(userId, fileBytes)
                     call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Profile.AVATAR_UPLOADED))

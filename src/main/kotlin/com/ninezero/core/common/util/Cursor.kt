@@ -15,8 +15,6 @@ import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.or
 import java.util.Base64
 
-// 커서 페이지네이션
-
 /** 커서 목록 응답 */
 @Serializable
 data class CursorResponse<T>(

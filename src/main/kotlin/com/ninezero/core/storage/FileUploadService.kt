@@ -1,6 +1,7 @@
 package com.ninezero.core.storage
 
 import com.ninezero.core.common.config.Constants
+import com.ninezero.core.common.exception.InvalidFileException
 import com.ninezero.core.common.util.logger
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.HttpClient
@@ -18,6 +19,7 @@ import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import kotlin.time.Duration.Companion.minutes
 
 // 직접 업로드 원본 내려받기
@@ -44,7 +46,7 @@ class FileUploadService(
         }
     }
 
-    // 삭제
+    // =====  삭제 =====
 
     /** 외부 URL·시드 공용 파일을 건너뛰는 삭제 */
     suspend fun deleteByUrl(imageUrl: String): Boolean {
@@ -89,7 +91,7 @@ class FileUploadService(
         }
     }
 
-    // 아바타
+    // =====  아바타 =====
 
     suspend fun uploadAvatarFromUrl(userId: Int, imageUrl: String): AvatarUploadResult? {
         return try {
@@ -118,7 +120,7 @@ class FileUploadService(
         extension: String
     ): AvatarUploadResult {
         if (file.size > StorageConfig.FileSizeLimit.AVATAR) {
-            throw IllegalArgumentException("프로필 이미지는 ${StorageConfig.FileSizeLimit.AVATAR / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("프로필 이미지는 ${StorageConfig.FileSizeLimit.AVATAR / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val fileName = StoragePaths.fileName("avatar", userId, extension)
@@ -143,14 +145,14 @@ class FileUploadService(
         return AvatarUploadResult(avatarUrl = avatarUrl, avatarThumbUrl = thumbUrl)
     }
 
-    // 상품·리뷰
+    // =====  상품·리뷰 =====
 
     suspend fun uploadProductImage(
         userId: Int,
         file: ByteArray
     ): String {
         if (file.size > StorageConfig.FileSizeLimit.PRODUCT) {
-            throw IllegalArgumentException("상품 이미지는 ${StorageConfig.FileSizeLimit.PRODUCT / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("상품 이미지는 ${StorageConfig.FileSizeLimit.PRODUCT / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val processed = imageProcessingService.generateProductImage(file)
@@ -166,7 +168,7 @@ class FileUploadService(
         file: ByteArray
     ): String {
         if (file.size > StorageConfig.FileSizeLimit.REVIEW_IMAGE) {
-            throw IllegalArgumentException("리뷰 이미지는 ${StorageConfig.FileSizeLimit.REVIEW_IMAGE / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("리뷰 이미지는 ${StorageConfig.FileSizeLimit.REVIEW_IMAGE / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val processed = imageProcessingService.convertToWebp(file) ?: file
@@ -183,7 +185,7 @@ class FileUploadService(
         files: List<ByteArray>
     ): List<String> {
         if (files.size > Constants.Commerce.MAX_REVIEW_IMAGES) {
-            throw IllegalArgumentException("리뷰 이미지는 최대 ${Constants.Commerce.MAX_REVIEW_IMAGES}개까지 업로드 가능합니다.")
+            throw InvalidFileException("리뷰 이미지는 최대 ${Constants.Commerce.MAX_REVIEW_IMAGES}개까지 업로드 가능합니다.")
         }
 
         return files.map { file ->
@@ -191,7 +193,7 @@ class FileUploadService(
         }
     }
 
-    // 포스트·댓글
+    // =====  포스트·댓글 =====
 
     suspend fun uploadPostMedia(
         userId: Int,
@@ -199,7 +201,7 @@ class FileUploadService(
         extension: String
     ): String {
         if (file.size > StorageConfig.FileSizeLimit.POST) {
-            throw IllegalArgumentException("포스트 미디어는 ${StorageConfig.FileSizeLimit.POST / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("포스트 미디어는 ${StorageConfig.FileSizeLimit.POST / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val path = StoragePaths.mediaPath(userId, extension)
@@ -227,7 +229,7 @@ class FileUploadService(
         extension: String
     ): String {
         if (file.size > StorageConfig.FileSizeLimit.COMMENT) {
-            throw IllegalArgumentException("댓글 미디어는 ${StorageConfig.FileSizeLimit.COMMENT / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("댓글 미디어는 ${StorageConfig.FileSizeLimit.COMMENT / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val path = StoragePaths.mediaPath(userId, extension)
@@ -243,7 +245,7 @@ class FileUploadService(
         return StoragePaths.publicUrl(StorageConfig.Buckets.COMMENTS, path)
     }
 
-    // 초안
+    // =====  초안 =====
 
     /** 글·댓글에 붙기 전 초안 미디어 업로드 */
     suspend fun uploadDraftMedia(bucket: String, userId: Int, file: ByteArray, extension: String): String {
@@ -265,7 +267,7 @@ class FileUploadService(
         return StoragePaths.publicUrl(bucket, path)
     }
 
-    // 채팅
+    // =====  채팅 =====
 
     suspend fun uploadChatImage(
         roomId: Int,
@@ -273,7 +275,7 @@ class FileUploadService(
         file: ByteArray
     ): Pair<String, String?> {
         if (file.size > StorageConfig.FileSizeLimit.CHAT_IMAGE) {
-            throw IllegalArgumentException("채팅 이미지는 ${StorageConfig.FileSizeLimit.CHAT_IMAGE / 1024 / 1024}MB를 초과할 수 없습니다.")
+            throw InvalidFileException("채팅 이미지는 ${StorageConfig.FileSizeLimit.CHAT_IMAGE / 1024 / 1024}MB를 초과할 수 없습니다.")
         }
 
         val processed = imageProcessingService.convertToWebp(file) ?: file
@@ -294,7 +296,7 @@ class FileUploadService(
         return url to thumbnailUrl
     }
 
-    // 트랜스코딩 교체
+    // =====  트랜스코딩 교체 =====
 
     suspend fun reuploadToUrl(url: String, bytes: ByteArray): Boolean {
         val (bucket, path) = extractBucketAndPath(url) ?: run {
@@ -310,7 +312,7 @@ class FileUploadService(
         }
     }
 
-    // 직접 업로드
+    // =====  직접 업로드 =====
 
     /** 덮어쓰기 금지 서명 업로드 URL */
     suspend fun createSignedUploadUrl(bucket: String, path: String): String =
@@ -335,7 +337,7 @@ class FileUploadService(
         val (bucket, path) = extractBucketAndPath(url)
             ?: throw IllegalArgumentException("우리 스토리지 파일이 아닙니다: $url")
         val size = fileSize(bucket, path)
-            ?: throw IllegalStateException("파일 정보를 찾을 수 없습니다: $url")
+            ?: throw IOException("파일 정보를 찾을 수 없습니다: $url")
         return downloadToTempFile(bucket, path, size)
     }
 
@@ -350,14 +352,14 @@ class FileUploadService(
                 timeout { requestTimeoutMillis = STORAGE_DOWNLOAD_TIMEOUT.inWholeMilliseconds }
             }.execute { response ->
                 if (!response.status.isSuccess()) {
-                    throw IllegalStateException("파일 다운로드 실패: ${response.status}")
+                    throw IOException("파일 다운로드 실패: ${response.status}")
                 }
                 val copied = withContext(Dispatchers.IO) {
                     file.outputStream().use { response.bodyAsChannel().copyTo(it) }
                 }
                 // 끊겨도 예외 없이 끝날 수 있어 크기 확인
                 if (copied != expectedSize) {
-                    throw IllegalStateException("파일 다운로드가 끊겼습니다: $copied/$expectedSize")
+                    throw IOException("파일 다운로드가 끊겼습니다: $copied/$expectedSize")
                 }
             }
         } catch (e: Exception) {

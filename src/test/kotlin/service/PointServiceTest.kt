@@ -9,7 +9,7 @@ import com.ninezero.core.database.entities.point.PointDao
 import com.ninezero.core.database.entities.point.PointHistoryDao
 import com.ninezero.core.database.entities.point.PointHistoryTable
 import com.ninezero.core.database.entities.point.PointTable
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.point.data.PointHistoryRepositoryImpl
 import com.ninezero.features.point.data.PointRepositoryImpl
 import com.ninezero.features.point.domain.PointService
@@ -50,7 +50,7 @@ import kotlin.time.Duration.Companion.days
 class PointServiceTest {
 
     private lateinit var pointService: PointService
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
 
     @BeforeAll
     fun setup() {
@@ -58,13 +58,13 @@ class PointServiceTest {
             TestDatabase.init()
 
             // Mock 객체 생성 (알림은 성공으로 가정)
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
 
             // Service 초기화
             pointService = PointService(
                 pointRepository = PointRepositoryImpl(),
                 pointHistoryRepository = PointHistoryRepositoryImpl(),
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
         }
@@ -479,7 +479,7 @@ class PointServiceTest {
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     fun `만료 알림은 사용자별로 합산해 한 번 보낸다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user = TestFixtures.createTestUser()
             query { pointService.createPointAccountInTransaction(user.id.value) }
             query { pointService.earnPointsInTransaction(user.id.value, BigDecimal("1000"), 1, "적립1") }
@@ -496,10 +496,10 @@ class PointServiceTest {
 
             // 같은 금액 두 건이 분 단위 중복 제거로 한 건(1000)으로 합쳐지지 않게 합산값 1건
             coVerify(exactly = 1, timeout = 2000) {
-                notificationService.sendPointExpiredNotification(userId = user.id.value, amount = any())
+                notificationSender.sendPointExpiredNotification(userId = user.id.value, amount = any())
             }
             coVerify {
-                notificationService.sendPointExpiredNotification(
+                notificationSender.sendPointExpiredNotification(
                     userId = user.id.value,
                     amount = match { it.compareTo(BigDecimal("2000")) == 0 }
                 )
@@ -637,7 +637,7 @@ class PointServiceTest {
             val overlapping = PointService(
                 pointRepository = PointRepositoryImpl(),
                 pointHistoryRepository = historyRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
             val interleaved = AtomicBoolean(false)

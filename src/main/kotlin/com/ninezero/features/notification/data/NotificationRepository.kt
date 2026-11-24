@@ -20,7 +20,7 @@ data class NotificationData(
 
 interface NotificationRepository {
 
-    // 알림 생성/읽음 처리/삭제
+    // 알림 생성·읽음 처리·삭제
     suspend fun createNotification(
         recipientId: Int,
         senderId: Int? = null,

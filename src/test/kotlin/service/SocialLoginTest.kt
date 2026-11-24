@@ -18,8 +18,11 @@ import com.ninezero.features.user.data.SocialAccountRepositoryImpl
 import com.ninezero.features.user.data.UserRepositoryImpl
 import com.ninezero.features.user.data.UserSessionRepositoryImpl
 import com.ninezero.features.user.domain.AuthService
-import com.ninezero.features.user.domain.social.SocialIdentity
-import com.ninezero.features.user.domain.social.SocialTokenVerifier
+import com.ninezero.features.user.domain.PasswordResetService
+import com.ninezero.features.user.domain.SocialAuthService
+import com.ninezero.features.user.domain.UserSessionService
+import com.ninezero.features.user.domain.oauth.SocialIdentity
+import com.ninezero.features.user.domain.oauth.SocialTokenVerifier
 import com.ninezero.features.user.presentation.models.request.LoginRequest
 import com.ninezero.features.user.presentation.models.request.RegisterRequest
 import com.ninezero.features.user.presentation.models.request.SocialCompleteRequest
@@ -43,6 +46,9 @@ import kotlin.test.assertTrue
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SocialLoginTest {
     private lateinit var authService: AuthService
+    private lateinit var socialAuthService: SocialAuthService
+    private lateinit var passwordResetService: PasswordResetService
+    private lateinit var userSessionService: UserSessionService
     private lateinit var userRepository: UserRepositoryImpl
     private lateinit var socialAccountRepository: SocialAccountRepositoryImpl
     private lateinit var fakeVerifier: FakeSocialTokenVerifier
@@ -84,22 +90,47 @@ class SocialLoginTest {
             val pointService = PointService(
                 pointRepository = PointRepositoryImpl(),
                 pointHistoryRepository = PointHistoryRepositoryImpl(),
-                notificationService = mockk(relaxed = true),
+                notificationSender = mockk(relaxed = true),
+                coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+            )
+
+            val userSessionRepository = UserSessionRepositoryImpl()
+            val refreshTokenRepository = RefreshTokenRepositoryImpl()
+            userSessionService = UserSessionService(
+                userSessionRepository = userSessionRepository,
+                userRepository = userRepository,
+                refreshTokenRepository = refreshTokenRepository,
+                webSocketManager = mockk(relaxed = true),
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
 
             authService = AuthService(
                 userRepository = userRepository,
-                userSessionRepository = UserSessionRepositoryImpl(),
-                refreshTokenRepository = RefreshTokenRepositoryImpl(),
+                userSessionRepository = userSessionRepository,
+                refreshTokenRepository = refreshTokenRepository,
                 emailService = emailService,
                 pointService = pointService,
-                coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
                 socialAccountRepository = socialAccountRepository,
-                socialTokenVerifiers = listOf(fakeVerifier, kakaoVerifier),
                 fileUploadService = fileUploadService,
                 cacheService = CacheService(),
                 accountCleanupService = TestFixtures.accountCleanupService(),
+                webSocketManager = mockk(relaxed = true),
+                userSessionService = userSessionService
+            )
+
+            socialAuthService = SocialAuthService(
+                userRepository = userRepository,
+                socialAccountRepository = socialAccountRepository,
+                pointService = pointService,
+                fileUploadService = fileUploadService,
+                userSessionService = userSessionService,
+                socialTokenVerifiers = listOf(fakeVerifier, kakaoVerifier)
+            )
+
+            passwordResetService = PasswordResetService(
+                userRepository = userRepository,
+                emailService = emailService,
+                userSessionService = userSessionService,
                 webSocketManager = mockk(relaxed = true)
             )
         }
@@ -129,10 +160,10 @@ class SocialLoginTest {
     )
 
     private suspend fun socialLogin() =
-        authService.socialLogin(socialLoginRequest(), "TestAgent", "127.0.0.1")
+        socialAuthService.socialLogin(socialLoginRequest(), "TestAgent", "127.0.0.1")
 
     private suspend fun socialComplete(signupToken: String, username: String) =
-        authService.socialComplete(
+        socialAuthService.socialComplete(
             SocialCompleteRequest(signupToken = signupToken, username = username, deviceId = "test-device"),
             "TestAgent",
             "127.0.0.1"
@@ -321,7 +352,7 @@ class SocialLoginTest {
             socialComplete(loginResponse.signupToken!!, "socialuser")
 
             assertFailsWith<SocialOnlyAccountException> {
-                authService.requestPasswordReset("social@example.com")
+                passwordResetService.requestPasswordReset("social@example.com")
             }
         }
     }
@@ -333,7 +364,7 @@ class SocialLoginTest {
         runBlocking {
             // FACEBOOK = enum에 없는 값. NAVER는 enum엔 있지만 테스트 verifier 목록에 없어 동일 예외.
             assertFailsWith<InvalidInputException> {
-                authService.socialLogin(
+                socialAuthService.socialLogin(
                     SocialLoginRequest(provider = "FACEBOOK", token = "token"),
                     "TestAgent",
                     "127.0.0.1"

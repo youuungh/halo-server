@@ -8,9 +8,9 @@ data class DeviceInfo(
 
 object UserAgentParser {
     fun parse(userAgent: String): DeviceInfo {
-        val ua = userAgent.lowercase()
+        val agent = userAgent.lowercase()
         return DeviceInfo(
-            deviceType = parseDeviceType(ua),
+            deviceType = parseDeviceType(agent),
             browser = parseBrowser(userAgent),
             os = parseOS(userAgent)
         )
@@ -28,10 +28,10 @@ object UserAgentParser {
                 ) && it != "K"
             }  // 크롬 UA reduction 익명값 K는 제외
 
-    private fun parseDeviceType(ua: String): String {
+    private fun parseDeviceType(agent: String): String {
         return when {
-            ua.contains("mobile") -> "Mobile"
-            ua.contains("tablet") || ua.contains("ipad") -> "Tablet"
+            agent.contains("mobile") -> "Mobile"
+            agent.contains("tablet") || agent.contains("ipad") -> "Tablet"
             else -> "Desktop"
         }
     }

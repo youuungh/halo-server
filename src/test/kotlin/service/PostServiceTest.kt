@@ -27,7 +27,7 @@ import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.VideoProcessingService
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.BookmarkRepositoryImpl
 import com.ninezero.features.social.data.FollowRepositoryImpl
 import com.ninezero.features.social.data.LikeRepositoryImpl
@@ -63,6 +63,7 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.v1.core.eq
 import org.junit.jupiter.api.*
 import java.io.File
+import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -84,7 +85,7 @@ class PostServiceTest {
     private lateinit var blockedUserRepository: BlockedUserRepositoryImpl
 
     // Mock Services
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
     private lateinit var videoProcessingService: VideoProcessingService
@@ -114,7 +115,7 @@ class PostServiceTest {
             blockedUserRepository = BlockedUserRepositoryImpl()
 
             // Mock Services
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             fileUploadService = mockk(relaxed = true)
             imageProcessingService = mockk(relaxed = true)
             videoProcessingService = mockk(relaxed = true)
@@ -164,7 +165,7 @@ class PostServiceTest {
                 subscriptionRepository = subscriptionRepository,
                 planRepository = planRepository,
                 blockedUserRepository = blockedUserRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 mediaDraftService = mediaDraftService,
                 fileUploadService = fileUploadService,
                 videoProcessingService = videoProcessingService,
@@ -263,7 +264,7 @@ class PostServiceTest {
     @Test
     fun `포스트 작성 실패 - 사진·영상 글은 초안 없이 만들 수 없다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val creator = TestFixtures.createTestCreator()
 
             assertFailsWith<InvalidInputException> {
@@ -271,14 +272,14 @@ class PostServiceTest {
             }
 
             assertEquals(0L, query { PostDao.all().count() })
-            coVerify(exactly = 0) { notificationService.sendNewPostNotifications(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendNewPostNotifications(any(), any(), any(), any()) }
         }
     }
 
     @Test
     fun `포스트 작성 - 초안을 지정한 순서로 미디어에 붙이고 초안은 지우며 알림은 바로 보낸다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val creator = TestFixtures.createTestCreator()
             val follower = TestFixtures.createTestUser()
             query { followRepository.createFollow(follower.id.value, creator.id.value) }
@@ -295,7 +296,7 @@ class PostServiceTest {
             assertEquals(2L, query { PostMediaDao.find { PostMediaTable.postId eq response.id }.count() })
             assertEquals(0L, query { MediaDraftDao.all().count() })
             coVerify(exactly = 1, timeout = 2000) {
-                notificationService.sendNewPostNotifications(creator.id.value, any(), response.id, listOf(follower.id.value))
+                notificationSender.sendNewPostNotifications(creator.id.value, any(), response.id, listOf(follower.id.value))
             }
             // 영상은 저장소에서 다시 받아 재인코딩
             coVerify { fileUploadService.downloadToTempFile(video.url) }
@@ -689,7 +690,7 @@ class PostServiceTest {
 
             postService.deletePost(post.id.value, user.id.value)
 
-            coVerify { notificationService.deactivateNewPostNotifications(post.id.value) }
+            coVerify { notificationSender.deactivateNewPostNotifications(post.id.value) }
             assertFailsWith<PostNotFoundException> {
                 postService.getPostById(post.id.value, user.id.value)
             }
@@ -868,10 +869,10 @@ class PostServiceTest {
             val user = TestFixtures.createTestUser()
             val post = TestFixtures.createTestPost(userId = user.id.value)
             val upload = prepareVideo(post.id.value, user.id.value)
-            coEvery { fileUploadService.downloadToTempFile(any(), any(), any()) } throws IllegalStateException("다운로드 실패")
+            coEvery { fileUploadService.downloadToTempFile(any(), any(), any()) } throws IOException("다운로드 실패")
 
             // When
-            assertFailsWith<IllegalStateException> {
+            assertFailsWith<IOException> {
                 attachByUpdate(
                     post.id.value, user.id.value,
                     files = listOf(byteArrayOf(1)),

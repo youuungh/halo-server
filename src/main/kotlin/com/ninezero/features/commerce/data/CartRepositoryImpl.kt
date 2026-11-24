@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.dao.with
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 
 class CartRepositoryImpl : CartRepository {
@@ -82,7 +83,7 @@ class CartRepositoryImpl : CartRepository {
         val productIds = carts.map { it.productId }.distinct()
         val products = ProductDao.find { ProductTable.id inList productIds }.associateBy { it.id.value }
         val creatorIds = products.values.map { it.creatorId }.distinct()
-        val creators = UserDao.find { UserTable.id inList creatorIds }.associateBy { it.id.value }
+        val creators = UserDao.find { UserTable.id inList creatorIds }.with(UserDao::profile).associateBy { it.id.value }
 
         return carts.mapNotNull { cart ->  // 상품·크리에이터 없으면 제외
             val product = products[cart.productId] ?: return@mapNotNull null

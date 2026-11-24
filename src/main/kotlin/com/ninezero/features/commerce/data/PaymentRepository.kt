@@ -21,7 +21,7 @@ interface PaymentRepository {
     suspend fun findByOrderId(orderId: Int): PaymentDao?
     suspend fun findByTransactionId(transactionId: String): PaymentDao?
     suspend fun findStalePendingPaymentOrderIds(before: LocalDateTime): List<Int>
-    suspend fun findStalePendingSubPayments(before: LocalDateTime): List<PaymentDao>
+    suspend fun findStalePendingSubscriptionPayments(before: LocalDateTime): List<PaymentDao>
     suspend fun findByOrderIds(orderIds: Collection<Int>): Map<Int, PaymentDao>
 
     // 결제 상태 수정
@@ -44,8 +44,8 @@ interface PaymentRepository {
     suspend fun requestRefund(paymentId: Int, refundReason: String, refundAmount: BigDecimal): Boolean
     suspend fun completeRefund(paymentId: Int, refundCompletedAt: LocalDateTime): Boolean
 
-    // 구독 결제 생성/조회/삭제
-    suspend fun createSubPayment(
+    // 구독 결제 생성·조회·삭제
+    suspend fun createSubscriptionPayment(
         subscriptionId: Int,
         provider: PaymentProvider,
         amount: BigDecimal,

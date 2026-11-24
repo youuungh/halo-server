@@ -77,14 +77,7 @@ fun Route.blockedUserRoutes() {
                 summary = "차단 사용자 목록 조회"
                 tags("BlockedUsers")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
                 response {

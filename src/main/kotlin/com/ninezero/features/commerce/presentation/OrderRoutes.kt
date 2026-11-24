@@ -139,14 +139,7 @@ fun Route.orderRoutes() {
                 summary = "내 주문 목록 조회"
                 tags("Orders")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
             }) {
@@ -159,7 +152,6 @@ fun Route.orderRoutes() {
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
-            // 결제 라우트와 동일 rate limit
             rateLimit(RateLimitName("payment")) {
                 delete("/{id}", {
                     summary = "주문 취소"
@@ -237,14 +229,7 @@ fun Route.orderRoutes() {
                 summary = "판매자 주문 목록 조회 (Creator)"
                 tags("Orders")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("filter") {
                         description = "상태 필터 (ALL/PENDING/SHIPPED/DELIVERED/CANCELLED, 기본값: ALL)"
                         required = false

@@ -19,3 +19,8 @@ object TierAccessEvaluator {
         return viewerTier?.canAccess(requiredTier) ?: false
     }
 }
+
+/** 상위 티어는 하위 콘텐츠 접근 가능 */
+fun SubscriptionPlanTier.canAccess(requiredTier: SubscriptionPlanTier): Boolean {
+    return this.ordinal >= requiredTier.ordinal
+}

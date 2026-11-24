@@ -4,6 +4,7 @@ import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.config.ProductSortType
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.util.*
 import com.ninezero.features.commerce.domain.ProductService
 import com.ninezero.features.commerce.presentation.models.request.*
@@ -25,14 +26,7 @@ fun Route.productRoutes() {
                 tags("Products")
                 description = "categoryId 필터 지원"
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<Int>("categoryId") {
                         description = "카테고리 ID (지정 시 해당 카테고리 상품만 조회)"
                         required = false
@@ -45,11 +39,7 @@ fun Route.productRoutes() {
                 val currentUserId = call.getUserIdOrNull()
                 val categoryIdRaw = call.getOptionalStringParam("categoryId")
                 val categoryId = categoryIdRaw?.let {
-                    it.toIntOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            ApiResponse.error<Unit>(Errors.Common.INVALID_ID)
-                        )
+                    it.toIntOrNull() ?: throw InvalidInputException(Errors.Common.INVALID_ID)
                 }
 
                 val response = if (categoryId != null) {
@@ -166,14 +156,7 @@ fun Route.productRoutes() {
                         description = "크리에이터 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("sort") {
                         description = "정렬 방식: LATEST (최신 등록순, 기본값), PRICE_LOW (낮은 가격순), PRICE_HIGH (높은 가격순)"
                         required = false
@@ -237,14 +220,7 @@ fun Route.productRoutes() {
                         description = "태그 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
                 response {
@@ -310,14 +286,7 @@ fun Route.productRoutes() {
                 summary = "내 상품 목록 조회 (Creator)"
                 tags("Products")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                 }
                 authResponse()
             }) {

@@ -6,7 +6,7 @@ import com.ninezero.core.common.config.SubscriptionStatus
 import com.ninezero.core.common.exception.*
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.query
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionPlanRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionRepositoryImpl
@@ -46,7 +46,7 @@ class SubscriptionServiceTest {
     private lateinit var subscriptionRepository: SubscriptionRepositoryImpl
     private lateinit var planRepository: SubscriptionPlanRepositoryImpl
     private lateinit var userRepository: UserRepositoryImpl
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var subscriptionPaymentService: SubscriptionPaymentService
 
     @BeforeAll
@@ -59,7 +59,7 @@ class SubscriptionServiceTest {
             userRepository = UserRepositoryImpl()
 
             // Mock 객체 생성
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             subscriptionPaymentService = mockk(relaxed = true)
 
             // Mock 동작 정의
@@ -69,7 +69,7 @@ class SubscriptionServiceTest {
                 planRepository = planRepository,
                 userRepository = userRepository,
                 followRepository = FollowRepositoryImpl(),
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 subscriptionPaymentService = subscriptionPaymentService,
                 cacheService = mockk(relaxed = true),
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
@@ -171,7 +171,7 @@ class SubscriptionServiceTest {
     @Test
     fun `새 구독 알림은 크리에이터에게 구독자 프로필 딥링크로 간다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user = TestFixtures.createTestUser()
             val creator = TestFixtures.createTestCreator()
             val plan = seedPlan(creator.id.value)
@@ -179,7 +179,7 @@ class SubscriptionServiceTest {
             subscriptionService.subscribe(user.id.value, SubscribeRequest(planId = plan.id.value, autoRenew = true))
 
             coVerify(timeout = 2000) {
-                notificationService.sendNewSubscriberNotification(
+                notificationSender.sendNewSubscriberNotification(
                     creatorId = creator.id.value,
                     subscriberId = user.id.value,
                     subscriberUsername = any(),
@@ -411,7 +411,7 @@ class SubscriptionServiceTest {
     @Test
     fun `기한 지난 구독은 만료되고 구독자에게 알림이 간다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user = TestFixtures.createTestUser()
             val creator = TestFixtures.createTestCreator()
             val plan = seedPlan(creator.id.value)
@@ -427,7 +427,7 @@ class SubscriptionServiceTest {
             assertEquals(1, result.successCount)
             assertEquals(SubscriptionStatus.EXPIRED, query { subscriptionRepository.findSubscriptionById(subscriptionId)!!.status })
             coVerify(exactly = 1) {
-                notificationService.sendSubscriptionExpiredNotification(user.id.value, subscriptionId, any(), any())
+                notificationSender.sendSubscriptionExpiredNotification(user.id.value, subscriptionId, any(), any())
             }
         }
     }
@@ -435,7 +435,7 @@ class SubscriptionServiceTest {
     @Test
     fun `자동 갱신 청구가 거절되면 자동 갱신을 끄고 구독자에게 알린다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user = TestFixtures.createTestUser()
             val creator = TestFixtures.createTestCreator()
             val plan = seedPlan(creator.id.value)
@@ -453,7 +453,7 @@ class SubscriptionServiceTest {
             assertEquals(1, result.failCount)
             assertEquals(false, query { subscriptionRepository.findSubscriptionById(subscriptionId)!!.autoRenew })
             coVerify(exactly = 1) {
-                notificationService.sendSubscriptionRenewalFailedNotification(user.id.value, subscriptionId, any(), any(), any())
+                notificationSender.sendSubscriptionRenewalFailedNotification(user.id.value, subscriptionId, any(), any(), any())
             }
         }
     }

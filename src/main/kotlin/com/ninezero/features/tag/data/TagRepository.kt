@@ -45,7 +45,7 @@ interface TagRepository {
         sectionTagId: Int? = null
     )
 
-    // 상품-태그 연결/조회
+    // 상품-태그 연결·조회
     suspend fun attachTagsToProduct(
         productId: Int,
         tagIds: Collection<Int>,
@@ -56,7 +56,7 @@ interface TagRepository {
 
     suspend fun findSectionTagsByProducts(productIds: Collection<Int>): Map<Int, TagDao>
 
-    // 섹션별 포스트/상품 조회/카운트
+    // 섹션별 포스트·상품 조회·카운트
     suspend fun findSectionPostIds(tagId: Int, page: Int, limit: Int): List<Int>
     suspend fun countSectionPosts(tagId: Int): Int
     suspend fun findSectionProductIds(tagId: Int, page: Int, limit: Int): List<Int>

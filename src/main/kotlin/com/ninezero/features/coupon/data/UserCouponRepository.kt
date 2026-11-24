@@ -6,7 +6,7 @@ import kotlinx.datetime.LocalDateTime
 
 interface UserCouponRepository {
 
-    // 사용자 쿠폰 발급/수정/삭제
+    // 사용자 쿠폰 발급·수정·삭제
     suspend fun create(
         userId: Int,
         couponId: Int,

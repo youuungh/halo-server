@@ -71,11 +71,11 @@ class CouponRedemptionService(
 
         // FREE_SHIPPING 쿠폰 구독자 차단
         if (coupon.type == CouponType.FREE_SHIPPING) {
-            val subs =
+            val subscriptions =
                 subscriptionRepository.findActiveSubscriptionsByCreators(userId, listOf(coupon.creatorId))
-            if (subs.isNotEmpty()) {
-                val subPlans = subscriptionPlanRepository.findPlansByIds(subs.map { it.planId })
-                if (subPlans.any { it.tier != SubscriptionPlanTier.FREE }) {
+            if (subscriptions.isNotEmpty()) {
+                val subscriptionPlans = subscriptionPlanRepository.findPlansByIds(subscriptions.map { it.planId })
+                if (subscriptionPlans.any { it.tier != SubscriptionPlanTier.FREE }) {
                     return CouponValidationResult.Invalid(Errors.Coupon.FREE_SHIPPING_COUPON_NOT_ALLOWED_FOR_SUBSCRIBERS)
                 }
             }

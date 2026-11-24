@@ -9,7 +9,7 @@ data class DetailContentBlock(
     val content: String? = null,
     val url: String? = null,
     val draftId: Int? = null,  // 요청에서만, 저장 시 url로 바뀜
-    // 이미지 블록 메타데이터
+    /** 이미지 블록 메타데이터 */
     val width: Int? = null,
     val height: Int? = null,
     val textStyle: String? = null,

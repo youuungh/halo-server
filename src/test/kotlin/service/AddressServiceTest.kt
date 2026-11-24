@@ -79,7 +79,7 @@ class AddressServiceTest {
             val first = addressService.createAddress(user.id.value, createRequest("첫 배송지", isDefault = true))
             val second = addressService.createAddress(user.id.value, createRequest("두 번째 배송지", isDefault = true))
 
-            val addresses = addressService.findAddresses(user.id.value)
+            val addresses = addressService.getAddresses(user.id.value)
 
             assertEquals(2, addresses.size)
             assertFalse(addresses.first { it.id == first.id }.isDefault)
@@ -94,7 +94,7 @@ class AddressServiceTest {
             val first = addressService.createAddress(user.id.value, createRequest("첫 배송지", isDefault = true))
             addressService.createAddress(user.id.value, createRequest("두 번째 배송지", isDefault = false))
 
-            val addresses = addressService.findAddresses(user.id.value)
+            val addresses = addressService.getAddresses(user.id.value)
 
             assertEquals(1, addresses.count { it.isDefault })
             assertTrue(addresses.first { it.id == first.id }.isDefault)
@@ -110,7 +110,7 @@ class AddressServiceTest {
 
             addressService.updateAddress(second.id, user.id.value, updateRequest("두 번째 배송지", isDefault = true))
 
-            val addresses = addressService.findAddresses(user.id.value)
+            val addresses = addressService.getAddresses(user.id.value)
 
             assertFalse(addresses.first { it.id == first.id }.isDefault)
             assertTrue(addresses.first { it.id == second.id }.isDefault)
@@ -128,7 +128,7 @@ class AddressServiceTest {
             }
 
             // 기본 해제가 먼저 실행되지만 트랜잭션이 되돌린다
-            assertTrue(addressService.findAddress(existing.id, user.id.value).isDefault)
+            assertTrue(addressService.getAddress(existing.id, user.id.value).isDefault)
         }
     }
 
@@ -142,7 +142,7 @@ class AddressServiceTest {
             val address = addressService.createAddress(owner.id.value, createRequest())
 
             assertFailsWith<NotFoundException> {
-                addressService.findAddress(address.id, other.id.value)
+                addressService.getAddress(address.id, other.id.value)
             }
         }
     }
@@ -158,7 +158,7 @@ class AddressServiceTest {
                 addressService.updateAddress(address.id, other.id.value, updateRequest("바뀐 수령인"))
             }
 
-            assertEquals("원래 수령인", addressService.findAddress(address.id, owner.id.value).recipientName)
+            assertEquals("원래 수령인", addressService.getAddress(address.id, owner.id.value).recipientName)
         }
     }
 
@@ -173,7 +173,7 @@ class AddressServiceTest {
                 addressService.deleteAddress(address.id, other.id.value)
             }
 
-            assertEquals(1, addressService.findAddresses(owner.id.value).size)
+            assertEquals(1, addressService.getAddresses(owner.id.value).size)
         }
     }
 
@@ -185,7 +185,7 @@ class AddressServiceTest {
             addressService.createAddress(owner.id.value, createRequest("내 배송지"))
             addressService.createAddress(other.id.value, createRequest("남의 배송지"))
 
-            val addresses = addressService.findAddresses(owner.id.value)
+            val addresses = addressService.getAddresses(owner.id.value)
 
             assertEquals(1, addresses.size)
             assertEquals("내 배송지", addresses.first().recipientName)
@@ -199,7 +199,7 @@ class AddressServiceTest {
         runBlocking {
             val user = TestFixtures.createTestUser()
 
-            assertFailsWith<NotFoundException> { addressService.findAddress(99_999, user.id.value) }
+            assertFailsWith<NotFoundException> { addressService.getAddress(99_999, user.id.value) }
             assertFailsWith<NotFoundException> { addressService.updateAddress(99_999, user.id.value, updateRequest()) }
             assertFailsWith<NotFoundException> { addressService.deleteAddress(99_999, user.id.value) }
         }
@@ -213,7 +213,7 @@ class AddressServiceTest {
 
             addressService.deleteAddress(address.id, user.id.value)
 
-            assertTrue(addressService.findAddresses(user.id.value).isEmpty())
+            assertTrue(addressService.getAddresses(user.id.value).isEmpty())
         }
     }
 }

@@ -23,10 +23,9 @@ import com.ninezero.features.commerce.presentation.models.response.ProductTagSec
 import com.ninezero.features.commerce.toDisplayName
 import com.ninezero.features.commerce.toProductResponse
 import com.ninezero.features.commerce.withCurrentDeal
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepository
 import com.ninezero.features.subscription.data.SubscriptionPlanRepository
-import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.tag.data.TagRepository
 import com.ninezero.features.tag.domain.requireOwnedTags
 import com.ninezero.features.tag.toTagResponse
@@ -44,9 +43,9 @@ class ProductService(
     private val userRepository: UserRepository,
     private val followRepository: FollowRepository,
     private val tagRepository: TagRepository,
-    private val subscriptionRepository: SubscriptionRepository,
     private val planRepository: SubscriptionPlanRepository,
-    private val notificationService: NotificationService,
+    private val productAccessService: ProductAccessService,
+    private val notificationSender: NotificationSender,
     private val mediaDraftService: MediaDraftService,
     private val fileUploadService: FileUploadService,
     private val cacheService: CacheService,
@@ -54,28 +53,29 @@ class ProductService(
 ) {
     private val logger = logger()
 
-    // 상품 생성
+    // =====  상품 생성 =====
+
     suspend fun createProduct(userId: Int, request: ProductRequest): ProductResponse {
         val name = request.name.trim()
         val description = request.description.trim()
         val brandName = request.brandName?.trim()
 
-        ValidationUtils.validateProductName(name)
-        ValidationUtils.validateProductDescription(description)
+        CommerceValidation.validateProductName(name)
+        CommerceValidation.validateProductDescription(description)
 
         val price = BigDecimal(request.price)
-        ValidationUtils.validatePositivePrice(price)
-        ValidationUtils.validateMaxPrice(price)
+        CommerceValidation.validatePositivePrice(price)
+        CommerceValidation.validateMaxPrice(price)
 
         val originalPrice = request.originalPrice?.let { BigDecimal(it) }
-        ValidationUtils.validateOriginalPrice(originalPrice, price)
-        originalPrice?.let { ValidationUtils.validateMaxPrice(it) }
-        ValidationUtils.validateStock(request.stock)
+        CommerceValidation.validateOriginalPrice(originalPrice, price)
+        originalPrice?.let { CommerceValidation.validateMaxPrice(it) }
+        CommerceValidation.validateStock(request.stock)
 
-        ValidationUtils.validateProductImageCount(request.imageDraftIds.size)
+        CommerceValidation.validateProductImageCount(request.imageDraftIds.size)
 
         val tags = request.tags ?: emptyList()
-        ValidationUtils.validateProductTags(tags)
+        CommerceValidation.validateProductTags(tags)
 
         request.tagIds?.let { tagIds ->
             if (request.sectionTagId != null && request.sectionTagId !in tagIds) {
@@ -143,7 +143,7 @@ class ProductService(
                 }
 
                 if (followerIds.isNotEmpty()) {
-                    notificationService.sendNewProductNotifications(
+                    notificationSender.sendNewProductNotifications(
                         creatorId = userId,
                         creatorUsername = response.creator.username,
                         productId = productId,
@@ -158,7 +158,8 @@ class ProductService(
         return response
     }
 
-    // 상품 조회
+    // =====  상품 조회 =====
+
     suspend fun getProductById(productId: Int, currentUserId: Int?): ProductResponse {
         val cacheKey = CacheKeys.product(productId, currentUserId)
         cacheService.getJson<ProductResponse>(cacheKey)?.let { cached ->
@@ -182,7 +183,7 @@ class ProductService(
                 ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
 
             // 잠금 상품도 미리보기 반환
-            val hasAccess = checkProductAccess(currentUserId, product)
+            val hasAccess = productAccessService.canAccess(currentUserId, product)
 
             productRepository.incrementViewCount(productId)
 
@@ -209,19 +210,7 @@ class ProductService(
             val products = productRepository.findAllProducts(validPage, validLimit)
             val total = productRepository.countAllProducts()
 
-            val userIds = products.map { it.creatorId }.distinct()
-            val users = userRepository.findUsersByIds(userIds)
-            val userMap = users.associateBy { it.id.value }
-            // 접근권한 일괄 조회
-            val accessMap = getProductAccessMap(currentUserId, products)
-
-            val productResponses = products.map { product ->
-                val creator = userMap[product.creatorId]?.toUserSummaryResponse()
-                    ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
-
-                val canAccess = accessMap[product.id.value] ?: false
-                product.toProductResponse(creator, canAccess)
-            }
+            val productResponses = buildProductResponses(products, currentUserId)
 
             val pagination = PaginationInfo(validPage, validLimit, total)
             createPagedResponse(productResponses, pagination)
@@ -283,32 +272,22 @@ class ProductService(
                 tags = request.tags
             )
 
-            val userIds = products.map { it.creatorId }.distinct()
-            val users = userRepository.findUsersByIds(userIds)
-            val userMap = users.associateBy { it.id.value }
-            val accessMap = getProductAccessMap(currentUserId, products)
-
-            val productResponses = products.map { product ->
-                val creator = userMap[product.creatorId]?.toUserSummaryResponse()
-                    ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
-
-                val canAccess = accessMap[product.id.value] ?: false
-                product.toProductResponse(creator, canAccess)
-            }
+            val productResponses = buildProductResponses(products, currentUserId)
 
             val pagination = PaginationInfo(validPage, validLimit, total)
             createPagedResponse(productResponses, pagination)
         }
     }
 
-    // 상품 수정
+    // =====  상품 수정 =====
+
     suspend fun updateProduct(productId: Int, userId: Int, request: UpdateProductRequest): ProductResponse {
         val name = request.name?.trim()
         val description = request.description?.trim()
         val brandName = request.brandName?.trim()
 
-        name?.let { ValidationUtils.validateProductName(it) }
-        description?.let { ValidationUtils.validateProductDescription(it) }
+        name?.let { CommerceValidation.validateProductName(it) }
+        description?.let { CommerceValidation.validateProductDescription(it) }
 
         val price = request.price?.let { BigDecimal(it) }
         // 정가는 null이면 유지, 빈 값이면 지움
@@ -316,14 +295,14 @@ class ProductService(
         val originalPrice = request.originalPrice?.takeIf { it.isNotBlank() }?.let { BigDecimal(it) }
 
         price?.let {
-            ValidationUtils.validatePositivePrice(it)
-            ValidationUtils.validateMaxPrice(it)
+            CommerceValidation.validatePositivePrice(it)
+            CommerceValidation.validateMaxPrice(it)
         }
-        originalPrice?.let { ValidationUtils.validateMaxPrice(it) }
+        originalPrice?.let { CommerceValidation.validateMaxPrice(it) }
 
-        request.stock?.let { ValidationUtils.validateStock(it) }
+        request.stock?.let { CommerceValidation.validateStock(it) }
 
-        ValidationUtils.validateProductTags(request.tags)
+        CommerceValidation.validateProductTags(request.tags)
 
         if (request.status != null) {  // status는 별도 API로만 변경
             throw InvalidInputException(Errors.Commerce.Product.PRODUCT_STATUS_UPDATE_VIA_STATUS_API_ONLY)
@@ -336,12 +315,12 @@ class ProductService(
         }
 
         val (response, removedImages) = query {
-            val product = verifyProductOwnership(productId, userId, Errors.Commerce.Product.PRODUCT_UPDATE_PERMISSION_DENIED)
+            val product = requireOwnedProduct(productId, userId, Errors.Commerce.Product.PRODUCT_UPDATE_PERMISSION_DENIED)
 
             // 한쪽만 바꿔도 저장값과 합쳐 정가 검증
             if (price != null || request.originalPrice != null) {
                 val finalOriginalPrice = if (clearOriginalPrice) null else originalPrice ?: product.originalPrice
-                ValidationUtils.validateOriginalPrice(finalOriginalPrice, price ?: product.price)
+                CommerceValidation.validateOriginalPrice(finalOriginalPrice, price ?: product.price)
             }
 
             // 활성 타임딜 중엔 판매가를 딜가 이하로 못 내림
@@ -425,7 +404,7 @@ class ProductService(
     // 판매 상태·타임딜
     suspend fun toggleProductStatus(productId: Int, userId: Int): String {
         val message = query {
-            val product = verifyProductOwnership(productId, userId, Errors.Commerce.Product.PRODUCT_STATUS_UPDATE_PERMISSION_DENIED)
+            val product = requireOwnedProduct(productId, userId, Errors.Commerce.Product.PRODUCT_STATUS_UPDATE_PERMISSION_DENIED)
 
             // 해제 계정 판매 재개 방지
             val user = userRepository.findUserById(userId)
@@ -466,7 +445,7 @@ class ProductService(
         val isClear = dealPrice == null && startAt == null && endAt == null
 
         val response = query {
-            val product = verifyProductOwnership(productId, userId, Errors.Commerce.Product.PRODUCT_DEAL_PERMISSION_DENIED)
+            val product = requireOwnedProduct(productId, userId, Errors.Commerce.Product.PRODUCT_DEAL_PERMISSION_DENIED)
 
             if (!isClear) {
                 if (dealPrice == null || startAt == null || endAt == null) {
@@ -497,10 +476,11 @@ class ProductService(
         return response
     }
 
-    // 상품 삭제
+    // =====  상품 삭제 =====
+
     suspend fun deleteProduct(productId: Int, userId: Int) {
         val imageUrls = query {
-            val product = verifyProductOwnership(productId, userId, Errors.Commerce.Product.PRODUCT_DELETE_PERMISSION_DENIED)
+            val product = requireOwnedProduct(productId, userId, Errors.Commerce.Product.PRODUCT_DELETE_PERMISSION_DENIED)
 
             val urls = product.imageUrls.decodeJsonToList()
             val detailContentImageUrls = extractDetailContentImageUrls(product.detailContent)
@@ -520,52 +500,22 @@ class ProductService(
 
     // 인기·섹션·연관 상품
     suspend fun getPopularProducts(limit: Int, currentUserId: Int? = null): List<ProductResponse> {
-        val validLimit = when {  // 1~100 보정
-            limit < 1 -> 20
-            limit > 100 -> 100
-            else -> limit
-        }
+        val validLimit = validateCursorLimit(limit)
 
         return query {
             val products = productRepository.findPopularProducts(validLimit)
 
-            val userIds = products.map { it.creatorId }.distinct()
-            val users = userRepository.findUsersByIds(userIds)
-            val userMap = users.associateBy { it.id.value }
-            val accessMap = getProductAccessMap(currentUserId, products)
-
-            products.map { product ->
-                val creator = userMap[product.creatorId]?.toUserSummaryResponse()
-                    ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
-
-                val canAccess = accessMap[product.id.value] ?: false
-                product.toProductResponse(creator, canAccess)
-            }
+            buildProductResponses(products, currentUserId)
         }
     }
 
     suspend fun getTrendingProducts(limit: Int, currentUserId: Int? = null): List<ProductResponse> {
-        val validLimit = when {  // 1~100 보정
-            limit < 1 -> 20
-            limit > 100 -> 100
-            else -> limit
-        }
+        val validLimit = validateCursorLimit(limit)
 
         return query {
             val products = productRepository.findTrendingProducts(validLimit)
 
-            val userIds = products.map { it.creatorId }.distinct()
-            val users = userRepository.findUsersByIds(userIds)
-            val userMap = users.associateBy { it.id.value }
-            val accessMap = getProductAccessMap(currentUserId, products)
-
-            products.map { product ->
-                val creator = userMap[product.creatorId]?.toUserSummaryResponse()
-                    ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
-
-                val canAccess = accessMap[product.id.value] ?: false
-                product.toProductResponse(creator, canAccess)
-            }
+            buildProductResponses(products, currentUserId)
         }
     }
 
@@ -617,7 +567,7 @@ class ProductService(
                     val userIds = products.map { it.creatorId }.distinct()
                     val users = userRepository.findUsersByIds(userIds)
                     val userMap = users.associateBy { it.id.value }
-                    val accessMap = getProductAccessMap(currentUserId, products)
+                    val accessMap = productAccessService.getAccessMap(currentUserId, products)
 
                     val productResponses = products.mapNotNull { product ->
                         val creator = userMap[product.creatorId]?.toUserSummaryResponse()
@@ -643,7 +593,7 @@ class ProductService(
             val allUserIds = allProducts.map { it.creatorId }.distinct()
             val allUsers = userRepository.findUsersByIds(allUserIds)
             val allUserMap = allUsers.associateBy { it.id.value }
-            val allAccessMap = getProductAccessMap(currentUserId, allProducts)
+            val allAccessMap = productAccessService.getAccessMap(currentUserId, allProducts)
 
             val allProductResponses = allProducts.mapNotNull { product ->
                 val creator = allUserMap[product.creatorId]?.toUserSummaryResponse()
@@ -688,7 +638,7 @@ class ProductService(
             val userIds = products.map { it.creatorId }.distinct()
             val users = userRepository.findUsersByIds(userIds)
             val userMap = users.associateBy { it.id.value }
-            val accessMap = getProductAccessMap(currentUserId, products)
+            val accessMap = productAccessService.getAccessMap(currentUserId, products)
 
             val productResponses = products.mapNotNull { product ->
                 val creator = userMap[product.creatorId]?.toUserSummaryResponse()
@@ -755,7 +705,7 @@ class ProductService(
             val userIds = allRelated.map { it.creatorId }.distinct()
             val users = userRepository.findUsersByIds(userIds)
             val userMap = users.associateBy { it.id.value }
-            val accessMap = getProductAccessMap(currentUserId, allRelated)
+            val accessMap = productAccessService.getAccessMap(currentUserId, allRelated)
 
             allRelated.mapNotNull { p ->
                 val creator = userMap[p.creatorId]?.toUserSummaryResponse() ?: return@mapNotNull null
@@ -769,84 +719,22 @@ class ProductService(
         return response
     }
 
-    // 접근 판정
-    suspend fun getProductAccessMap(
-        userId: Int?,
-        products: Collection<ProductDao>
-    ): Map<Int, Boolean> {
-        if (products.isEmpty()) return emptyMap()
+    /** 작성자·접근 여부를 붙인 상품 응답, 작성자가 없으면 오류 */
+    private suspend fun buildProductResponses(products: List<ProductDao>, currentUserId: Int?): List<ProductResponse> {
+        val userMap = userRepository.findUsersByIds(products.map { it.creatorId }.distinct()).associateBy { it.id.value }
+        val accessMap = productAccessService.getAccessMap(currentUserId, products)
 
-        if (userId == null) {  // 비로그인은 FREE만 접근
-            return products.associate { product ->
-                product.id.value to (product.requiredTier == SubscriptionPlanTier.FREE)
-            }
-        }
+        return products.map { product ->
+            val creator = userMap[product.creatorId]?.toUserSummaryResponse()
+                ?: throw CreatorNotFoundException(Errors.Commerce.Product.CREATOR_NOT_FOUND)
 
-        val restrictedProducts = products.filter { product ->
-            product.creatorId != userId && product.requiredTier != SubscriptionPlanTier.FREE
-        }
-
-        if (restrictedProducts.isEmpty()) {  // 제한 상품 없으면 즉시 true
-            return products.associate { it.id.value to true }
-        }
-
-        val creatorIds = restrictedProducts.map { it.creatorId }.distinct()
-
-        val subscriptions = subscriptionRepository.findActiveSubscriptionsByCreators(userId, creatorIds)
-        val subscriptionMap = subscriptions.associateBy { it.creatorId }
-
-        val planIds = subscriptions.map { it.planId }.distinct()
-        val planMap = planRepository.findPlansByIds(planIds).associateBy { it.id.value }
-
-        val creatorTierMap = subscriptionMap.mapNotNull { (creatorId, subscription) ->
-            val tier = planMap[subscription.planId]?.tier ?: return@mapNotNull null
-            creatorId to tier
-        }.toMap()
-
-        return products.associate { product ->
-            product.id.value to resolveProductAccess(userId, product, creatorTierMap)
+            product.toProductResponse(creator, accessMap[product.id.value] ?: false)
         }
     }
 
-    private suspend fun checkProductAccess(userId: Int?, product: ProductDao): Boolean {
-        if (userId == null) {  // 비로그인은 FREE만
-            return resolveProductAccess(
-                userId = null,
-                product = product,
-                creatorTierMap = emptyMap()
-            )
-        }
+    // =====  공통 보조 =====
 
-        val creatorTierMap = if (product.creatorId == userId || product.requiredTier == SubscriptionPlanTier.FREE) {  // 본인 상품·FREE는 항상 허용
-            emptyMap()
-        } else {
-            val subscription = subscriptionRepository.findActiveSubscription(userId, product.creatorId)
-                ?: return false
-            val plan = planRepository.findPlanById(subscription.planId)
-                ?: return false
-            mapOf(product.creatorId to plan.tier)
-        }
-
-        return resolveProductAccess(userId, product, creatorTierMap)
-    }
-
-    private fun resolveProductAccess(
-        userId: Int?,
-        product: ProductDao,
-        creatorTierMap: Map<Int, SubscriptionPlanTier>
-    ): Boolean {
-        return TierAccessEvaluator.canAccess(
-            viewerId = userId,
-            ownerId = product.creatorId,
-            creatorId = product.creatorId,
-            requiredTier = product.requiredTier,
-            isSecret = false,
-            viewerTier = creatorTierMap[product.creatorId]
-        )
-    }
-
-    // 공통 보조
-    private suspend fun verifyProductOwnership(productId: Int, userId: Int, errorMessage: String): ProductDao {
+    private suspend fun requireOwnedProduct(productId: Int, userId: Int, errorMessage: String): ProductDao {
         val product = productRepository.findProductById(productId)
             ?: throw ProductNotFoundException(Errors.Commerce.Product.PRODUCT_NOT_FOUND)
 
@@ -872,7 +760,7 @@ class ProductService(
         if (sources.any { (url, _) -> url != null && url !in storedUrls }) {
             throw InvalidInputException(Errors.File.FILE_NOT_OWNED)
         }
-        ValidationUtils.validateProductImageCount(sources.size)
+        CommerceValidation.validateProductImageCount(sources.size)
 
         val drafts = ArrayDeque(mediaDraftService.claimInTransaction(userId, MediaDraftTargetType.PRODUCT, sources.mapNotNull { (_, draftId) -> draftId }))
         return sources.map { (url, _) -> url ?: drafts.removeFirst().url }.normalizeProductImages()

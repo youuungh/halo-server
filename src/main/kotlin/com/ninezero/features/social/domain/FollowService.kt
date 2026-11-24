@@ -18,7 +18,7 @@ import com.ninezero.core.common.util.query
 import com.ninezero.core.common.util.toCursorPage
 import com.ninezero.core.common.util.validateCursorLimit
 import com.ninezero.core.common.util.validatePaginationParams
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepository
 import com.ninezero.features.social.presentation.models.response.FollowListResponse
 import com.ninezero.features.social.presentation.models.response.FollowResponse
@@ -36,13 +36,14 @@ class FollowService(
     private val followRepository: FollowRepository,
     private val userRepository: UserRepository,
     private val blockedUserRepository: BlockedUserRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val coroutineScope: CoroutineScope,
     private val cacheService: CacheService
 ) {
     private val logger = logger()
 
-    // 팔로우/언팔로우
+    // =====  팔로우·언팔로우 =====
+
     suspend fun followUser(followerId: Int, followingId: Int): FollowResponse {
         if (followerId == followingId) {
             throw InvalidInputException(Errors.Social.Follow.CANNOT_FOLLOW_SELF)
@@ -78,7 +79,7 @@ class FollowService(
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
-                notificationService.sendFollowNotification(followerId, followingId)
+                notificationSender.sendFollowNotification(followerId, followingId)
             } catch (e: Exception) {
                 logger.error("팔로우 알림 전송 실패: followerId=$followerId, followingId=$followingId, error=${e.message}", e)
             }
@@ -114,7 +115,8 @@ class FollowService(
         return response
     }
 
-    // 팔로워·팔로잉 목록
+    // =====  팔로워·팔로잉 목록 =====
+
     suspend fun getFollowers(
         userId: Int,
         currentUserId: Int? = null,
@@ -227,7 +229,8 @@ class FollowService(
         }
     }
 
-    // 맞팔·추천
+    // =====  맞팔·추천 =====
+
     suspend fun getMutualFollow(userId1: Int, userId2: Int): MutualFollowResponse {
         return query {
             val aFollowsB = followRepository.isFollowing(userId1, userId2)
@@ -237,6 +240,7 @@ class FollowService(
     }
 
     suspend fun getFollowRecommendations(userId: Int, limit: Int = Constants.DEFAULT_PAGE_LIMIT): List<UserSummaryResponse> {
+        val validLimit = validateCursorLimit(limit)
         return query {
             val userFollowing = followRepository.findFollowing(userId, cursor = null, limit = Constants.Social.FOLLOW_RECOMMENDATION_SOURCE_LIMIT)
             val followingIds = userFollowing.map { it.followingId }
@@ -263,7 +267,7 @@ class FollowService(
 
             val recommendedUserIds = candidateUserIds
                 .filter { followStatusMap[it] == false }
-                .take(limit)
+                .take(validLimit)
 
             // followerCount·isFollowing 기본값
             val users = userRepository.findUsersByIds(recommendedUserIds)
@@ -277,7 +281,8 @@ class FollowService(
         }
     }
 
-    // 크리에이터 알림 설정
+    // =====  크리에이터 알림 설정 =====
+
     suspend fun updateNewPostNotification(
         followerId: Int,
         followingId: Int,

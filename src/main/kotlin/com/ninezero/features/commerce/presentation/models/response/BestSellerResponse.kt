@@ -7,6 +7,6 @@ data class BestSellerResponse(
     val productId: Int,
     val productName: String,
     val productImageUrl: String? = null,
-    val quantity: Int,  // 판매 수량
+    val quantity: Int,
     val revenue: String
 )

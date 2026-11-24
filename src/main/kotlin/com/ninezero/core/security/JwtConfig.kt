@@ -65,7 +65,7 @@ object JwtConfig {
         email: String,
         name: String?,
         picture: String?,
-        validityMs: Long
+        expiresInMs: Long
     ): String {
         val builder = JWT.create()  // username 확정 전까지 DB 저장 없음
             .withSubject("SocialSignup")
@@ -74,7 +74,7 @@ object JwtConfig {
             .withClaim("provider", provider)
             .withClaim("providerUserId", providerUserId)
             .withClaim("email", email)
-            .withExpiresAt(Date(System.currentTimeMillis() + validityMs))
+            .withExpiresAt(Date(System.currentTimeMillis() + expiresInMs))
         name?.let { builder.withClaim("name", it) }
         picture?.let { builder.withClaim("picture", it) }
         return builder.sign(algorithm)

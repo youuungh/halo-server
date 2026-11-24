@@ -5,7 +5,7 @@ import com.ninezero.core.cache.CacheService
 import com.ninezero.core.common.config.*
 import com.ninezero.core.common.exception.*
 import com.ninezero.core.common.util.*
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.batchLoadCommentMediaItems
 import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.data.*
@@ -26,14 +26,15 @@ class LikeService(
     private val bookmarkRepository: BookmarkRepository,
     private val followRepository: FollowRepository,
     private val blockedUserRepository: BlockedUserRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val postService: PostService,
     private val coroutineScope: CoroutineScope,
     private val cacheService: CacheService
 ) {
     private val logger = logger()
 
-    // 좋아요 토글
+    // =====  좋아요 토글 =====
+
     suspend fun togglePostLike(currentUserId: Int, postId: Int): LikeToggleResponse {
         var notifyPostOwnerId: Int? = null
         val response = query {
@@ -85,7 +86,7 @@ class LikeService(
         notifyPostOwnerId?.let { ownerId ->
             coroutineScope.launch {
                 try {
-                    notificationService.sendLikePostNotification(ownerId, currentUserId, postId)
+                    notificationSender.sendLikePostNotification(ownerId, currentUserId, postId)
                 } catch (e: Exception) {
                     logger.error("좋아요 알림 전송 실패 - postId: $postId", e)
                 }
@@ -141,15 +142,15 @@ class LikeService(
         }
 
         val ownerId = notifyCommentOwnerId
-        val pId = notifyPostId
-        if (ownerId != null && pId != null) {
+        val postId = notifyPostId
+        if (ownerId != null && postId != null) {
             coroutineScope.launch {  // 커밋 후 알림 발송
                 try {
-                    notificationService.sendLikeCommentNotification(
+                    notificationSender.sendLikeCommentNotification(
                         commentOwnerId = ownerId,
                         likerId = currentUserId,
                         commentId = commentId,
-                        postId = pId
+                        postId = postId
                     )
                 } catch (e: Exception) {
                     logger.error("댓글 좋아요 알림 전송 실패 - commentId: $commentId", e)
@@ -159,7 +160,8 @@ class LikeService(
         return response
     }
 
-    // 좋아요한 사용자 조회
+    // =====  좋아요한 사용자 조회 =====
+
     suspend fun getPostLikedUsers(
         postId: Int,
         viewerId: Int,
@@ -244,7 +246,8 @@ class LikeService(
         }
     }
 
-    // 내가 좋아요한 항목
+    // =====  내가 좋아요한 항목 =====
+
     suspend fun getUserLikedItems(
         currentUserId: Int,
         cursor: String? = null,

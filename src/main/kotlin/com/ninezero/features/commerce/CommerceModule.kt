@@ -18,6 +18,7 @@ val commerceModule = module {
     singleOf(::BillingKeyRepositoryImpl) bind BillingKeyRepository::class
 
     // Services
+    singleOf(::ProductAccessService)
     singleOf(::ProductService)
     singleOf(::CartService)
     singleOf(::OrderResponseAssembler)

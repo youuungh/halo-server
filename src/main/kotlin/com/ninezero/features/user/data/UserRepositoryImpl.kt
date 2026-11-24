@@ -339,7 +339,7 @@ class UserRepositoryImpl : UserRepository {
     }
 
     /** 유저의 모든 기기 FID 목록 */
-    override suspend fun getDeviceFidsForUser(userId: Int): List<String> {
+    override suspend fun findDeviceFidsForUser(userId: Int): List<String> {
         return DeviceTokenTable
             .select(DeviceTokenTable.fid)
             .where { DeviceTokenTable.userId eq userId }
@@ -347,7 +347,7 @@ class UserRepositoryImpl : UserRepository {
     }
 
     /** 여러 유저의 기기 FID 목록 */
-    override suspend fun getDeviceFidsForUsers(userIds: Collection<Int>): List<String> {
+    override suspend fun findDeviceFidsForUsers(userIds: Collection<Int>): List<String> {
         if (userIds.isEmpty()) return emptyList()
 
         return DeviceTokenTable

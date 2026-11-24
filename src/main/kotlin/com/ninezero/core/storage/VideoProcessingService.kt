@@ -61,7 +61,7 @@ class VideoProcessingService {
                 "-vframes", "1",
                 "-q:v", "3",
                 thumb.absolutePath
-            ).runQuietly()
+            ).runSilently()
 
             if (succeeded && thumb.exists() && thumb.length() > 0) {
                 thumb.readBytes()
@@ -90,7 +90,7 @@ class VideoProcessingService {
                 "-map_metadata", "-1",  // 촬영 위치 등 메타데이터 제거
                 "-movflags", "+faststart",  // moov 뒤에 있으면 재생·탐색 늦음
                 out.absolutePath
-            ).runQuietly()
+            ).runSilently()
 
             if (succeeded && out.exists() && out.length() > 0) {
                 out.readBytes()
@@ -134,7 +134,7 @@ class VideoProcessingService {
                 "-b:a", "128k",
                 "-movflags", "+faststart",
                 out.absolutePath
-            ).runQuietly()
+            ).runSilently()
 
             if (succeeded && out.exists() && out.length() > 0) {
                 out.readBytes()
@@ -177,13 +177,13 @@ class VideoProcessingService {
                 rawWidth to rawHeight
             }
 
-            val durationSec = root["format"]?.jsonObject
+            val durationSeconds = root["format"]?.jsonObject
                 ?.get("duration")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
 
             VideoMetadata(
                 width = width,
                 height = height,
-                durationMs = durationSec?.let { (it * 1000).toLong() }
+                durationMs = durationSeconds?.let { (it * 1000).toLong() }
             )
         } catch (e: Exception) {
             logger.warn("ffprobe JSON 파싱 실패: {}", e.message)

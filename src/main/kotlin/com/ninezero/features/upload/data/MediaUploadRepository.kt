@@ -6,7 +6,7 @@ import kotlinx.datetime.LocalDateTime
 
 interface MediaUploadRepository {
 
-    // 업로드 기록 생성/삭제
+    // 업로드 기록 생성·삭제
     suspend fun createUpload(
         userId: Int,
         purpose: UploadPurpose,

@@ -28,7 +28,8 @@ class CouponService(
     private val userRepository: UserRepository
 ) {
 
-    // 쿠폰 생성
+    // =====  쿠폰 생성 =====
+
     suspend fun createCoupon(
         creatorId: Int,
         request: CouponRequest
@@ -38,14 +39,14 @@ class CouponService(
         val maxDiscountAmount = request.maxDiscountAmount?.let { BigDecimal(it) }
         val targetIds = request.targetIds?.encodeToTargetIds()
 
-        ValidationUtils.validateDateRange(request.startDate, request.endDate)
-        ValidationUtils.validateCouponTypeFields(
+        CouponValidation.validateDateRange(request.startDate, request.endDate)
+        CouponValidation.validateCouponTypeFields(
             type = request.type,
             discountRate = if (request.type == CouponType.PERCENTAGE) discountValue.toInt() else null,
             discountAmount = if (request.type == CouponType.FIXED_AMOUNT) request.discountValue else null
         )
-        ValidationUtils.validateTargetIds(request.targetIds)
-        ValidationUtils.validateCouponMaxDiscountAmount(request.maxDiscountAmount)
+        CommonValidation.validateTargetIds(request.targetIds)
+        CouponValidation.validateCouponMaxDiscountAmount(request.maxDiscountAmount)
 
         if (request.type == CouponType.PERCENTAGE && discountValue > BigDecimal(Constants.Coupon.MAX_DISCOUNT_RATE)) {
             throw InvalidInputException(Errors.Coupon.COUPON_DISCOUNT_RATE_EXCEEDED)
@@ -63,7 +64,7 @@ class CouponService(
             val code = if (request.code != null) {
                 val manualCode = request.code.uppercase().trim()
 
-                ValidationUtils.validateManualCouponCode(manualCode)
+                CouponValidation.validateManualCouponCode(manualCode)
 
                 if (manualCode.isBlank()) {
                     throw InvalidCouponCodeException(Errors.Coupon.COUPON_CODE_FORMAT_INVALID)
@@ -97,7 +98,8 @@ class CouponService(
         }
     }
 
-    // 쿠폰 조회
+    // =====  쿠폰 조회 =====
+
     suspend fun getMyCoupons(
         creatorId: Int,
         page: Int,
@@ -123,13 +125,14 @@ class CouponService(
         }
     }
 
-    // 쿠폰 수정/삭제
+    // =====  쿠폰 수정·삭제 =====
+
     suspend fun updateCoupon(
         couponId: Int,
         creatorId: Int,
         request: UpdateCouponRequest
     ): CouponResponse {
-        ValidationUtils.validateCouponMaxDiscountAmount(request.maxDiscountAmount)
+        CouponValidation.validateCouponMaxDiscountAmount(request.maxDiscountAmount)
 
         // null이면 유지, 빈 값이면 지움
         val clearDescription = request.description?.isBlank() == true
@@ -169,7 +172,7 @@ class CouponService(
 
             // 한쪽만 바꿔도 저장값과 합쳐 기간 검증
             if (request.startDate != null || request.endDate != null) {
-                ValidationUtils.validateDateRange(request.startDate ?: coupon.startDate, request.endDate ?: coupon.endDate)
+                CouponValidation.validateDateRange(request.startDate ?: coupon.startDate, request.endDate ?: coupon.endDate)
             }
 
             val updated = couponRepository.updateCoupon(
@@ -212,7 +215,8 @@ class CouponService(
         }
     }
 
-    // 쿠폰 발급·지갑
+    // =====  쿠폰 발급·지갑 =====
+
     suspend fun claimCoupon(userId: Int, code: String): UserCouponResponse {
         val normalizedCode = code.uppercase().trim()
 
@@ -292,7 +296,8 @@ class CouponService(
         }
     }
 
-    // 공통 보조
+    // =====  공통 보조 =====
+
     private suspend fun getCreatorName(creatorId: Int): String? {
         val creator = userRepository.findUserById(creatorId) ?: return null
         return creator.profile?.displayName ?: creator.username

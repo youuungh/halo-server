@@ -8,7 +8,7 @@ import kotlinx.datetime.LocalDateTime
 
 interface MediaDraftRepository {
 
-    // 초안 생성/삭제
+    // 초안 생성·삭제
     suspend fun createDraft(
         userId: Int,
         targetType: MediaDraftTargetType,

@@ -31,15 +31,15 @@ class NotificationPreferenceRepositoryImpl : NotificationPreferenceRepository {
         chatEnabled: Boolean?,
         systemEnabled: Boolean?
     ): NotificationPreferenceDao {
-        val pref = findByUserId(userId) ?: createDefault(userId)  // 없으면 기본값 생성 후 적용
+        val preference = findByUserId(userId) ?: createDefault(userId)  // 없으면 기본값 생성 후 적용
 
-        socialEnabled?.let { pref.socialEnabled = it }  // null은 유지
-        creatorActivityEnabled?.let { pref.creatorActivityEnabled = it }
-        commerceEnabled?.let { pref.commerceEnabled = it }
-        chatEnabled?.let { pref.chatEnabled = it }
-        systemEnabled?.let { pref.systemEnabled = it }
+        socialEnabled?.let { preference.socialEnabled = it }  // null은 유지
+        creatorActivityEnabled?.let { preference.creatorActivityEnabled = it }
+        commerceEnabled?.let { preference.commerceEnabled = it }
+        chatEnabled?.let { preference.chatEnabled = it }
+        systemEnabled?.let { preference.systemEnabled = it }
 
-        return pref
+        return preference
     }
 
     /** 알림 설정 기본값 생성 */

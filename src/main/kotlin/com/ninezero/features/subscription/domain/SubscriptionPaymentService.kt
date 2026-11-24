@@ -46,7 +46,7 @@ class SubscriptionPaymentService(
         subscriptionId: Int,
         userId: Int
     ) {
-        val ctx = query {
+        val chargeContext = query {
             val subscription = subscriptionRepository.findSubscriptionById(subscriptionId)
                 ?: throw SubscriptionNotFoundException(subscriptionId)
 
@@ -66,17 +66,17 @@ class SubscriptionPaymentService(
         val orderId = generateNumericOrderId()
         // 기록 실패도 정리 작업이 확정하도록 청구 전 대기 기록
         val pendingPaymentId = query {
-            paymentRepository.createSubPayment(
+            paymentRepository.createSubscriptionPayment(
                 subscriptionId = subscriptionId,
                 provider = PaymentProvider.TOSS_BILLING,
-                amount = ctx.amount,
+                amount = chargeContext.amount,
                 isRenewal = false,
                 transactionId = orderId
             ).id.value
         }
 
         val charged = try {
-            chargeOrUnknown(ctx, orderId, "구독 - ${ctx.planName}")
+            chargeOrUnknown(chargeContext, orderId, "구독 - ${chargeContext.planName}")
         } catch (e: Exception) {
             // 구독 롤백이 막히지 않게 대기 기록 삭제
             try {
@@ -94,7 +94,7 @@ class SubscriptionPaymentService(
 
         try {
             query {
-                recordSubPayment(subscriptionId, ctx.amount, isRenewal = false, orderId = orderId, confirmed = confirmed)
+                recordSubscriptionPayment(subscriptionId, chargeContext.amount, isRenewal = false, orderId = orderId, confirmed = confirmed)
             }
         } catch (e: Exception) {
             logger.error("구독 초회 결제 기록 실패(청구는 완료됨, 정리 작업이 확정): subscriptionId={}, orderId={}, error={}", subscriptionId, orderId, e.message)
@@ -125,16 +125,16 @@ class SubscriptionPaymentService(
             return RenewalResult.UNKNOWN
         } ?: return if (cancelled) RenewalResult.SKIPPED else RenewalResult.DECLINED  // 재시도 무의미
 
-        val (ctx, expiresAt) = captured
+        val (chargeContext, expiresAt) = captured
         // 멱등키
         val orderId = "$subscriptionId${expiresAt.date.format(LocalDate.Formats.ISO_BASIC)}"
         val confirmed = when (
             val result = tossPaymentClient.chargeBilling(
-                billingKey = ctx.billingKey,
-                customerKey = ctx.customerKey,
-                amount = ctx.amount.toLong(),
+                billingKey = chargeContext.billingKey,
+                customerKey = chargeContext.customerKey,
+                amount = chargeContext.amount.toLong(),
                 orderId = orderId,
-                orderName = "구독 갱신 - ${ctx.planName}",
+                orderName = "구독 갱신 - ${chargeContext.planName}",
                 idempotencyKey = orderId
             )
         ) {
@@ -147,7 +147,7 @@ class SubscriptionPaymentService(
         return try {
             // 기록과 만료일 연장은 한 트랜잭션
             query {
-                recordSubPayment(subscriptionId, ctx.amount, isRenewal = true, orderId = orderId, confirmed = confirmed)
+                recordSubscriptionPayment(subscriptionId, chargeContext.amount, isRenewal = true, orderId = orderId, confirmed = confirmed)
                 subscriptionRepository.extendSubscription(
                     subscriptionId = subscriptionId,
                     newExpiresAt = expiresAt.date
@@ -170,7 +170,7 @@ class SubscriptionPaymentService(
         diffAmount: BigDecimal,
         planName: String
     ) {
-        val ctx = query {
+        val chargeContext = query {
             val billing = billingKeyRepository.findActiveByUserId(userId)
                 ?: throw BillingKeyRequiredException(Errors.Commerce.Payment.BILLING_KEY_REQUIRED)
             ChargeContext(diffAmount, planName, billing.billingKey, billing.customerKey)
@@ -178,11 +178,11 @@ class SubscriptionPaymentService(
 
         // 재시도가 같은 키를 쓰도록 결정적 멱등키
         val orderId = upgradeOrderId(subscriptionId, newPlanId)
-        val confirmed = charge(ctx, orderId, "구독 업그레이드 - ${ctx.planName}")
+        val confirmed = charge(chargeContext, orderId, "구독 업그레이드 - ${chargeContext.planName}")
 
         // 기록과 플랜 변경은 한 트랜잭션
         query {
-            recordSubPayment(subscriptionId, diffAmount, isRenewal = false, orderId = orderId, confirmed = confirmed)
+            recordSubscriptionPayment(subscriptionId, diffAmount, isRenewal = false, orderId = orderId, confirmed = confirmed)
             subscriptionRepository.updateSubscriptionPlan(subscriptionId, newPlanId)
         }
     }
@@ -192,7 +192,7 @@ class SubscriptionPaymentService(
         val before = (Clock.System.now() - olderThanMinutes.minutes).toLocalDateTime(TimeZone.UTC)
 
         val stale = query {
-            paymentRepository.findStalePendingSubPayments(before).mapNotNull { payment ->
+            paymentRepository.findStalePendingSubscriptionPayments(before).mapNotNull { payment ->
                 val subscriptionId = payment.subscriptionId ?: return@mapNotNull null
                 val orderId = payment.transactionId ?: return@mapNotNull null
                 Triple(payment.id.value, subscriptionId, orderId)
@@ -216,7 +216,7 @@ class SubscriptionPaymentService(
                             )
                             return@query
                         }
-                        completeSubPayment(paymentId, paidToss)
+                        completeSubscriptionPayment(paymentId, paidToss)
                     } else {
                         // 미청구 확정, 결제 없이 열린 구독은 만료
                         paymentRepository.updateStatus(paymentId, PaymentStatus.FAILED)
@@ -251,28 +251,28 @@ class SubscriptionPaymentService(
 
     private fun upgradeOrderId(subscriptionId: Int, newPlanId: Int): String {
         val now = nowUtc()
-        val dateStr = now.date.format(LocalDate.Formats.ISO_BASIC)
-        return "$dateStr${subscriptionId.toString().padStart(6, '0')}${newPlanId.toString().padStart(4, '0')}"
+        val datePart = now.date.format(LocalDate.Formats.ISO_BASIC)
+        return "$datePart${subscriptionId.toString().padStart(6, '0')}${newPlanId.toString().padStart(4, '0')}"
     }
 
     private fun generateNumericOrderId(): String {
         val now = nowUtc()
-        val dateStr = now.date.format(LocalDate.Formats.ISO_BASIC)
-        val randomStr = (10_000_000..99_999_999).random()  // 날짜8 + 랜덤8 숫자
-        return "$dateStr$randomStr"
+        val datePart = now.date.format(LocalDate.Formats.ISO_BASIC)
+        val randomPart = (10_000_000..99_999_999).random()  // 날짜8 + 랜덤8 숫자
+        return "$datePart$randomPart"
     }
 
     /** 토스 빌링 청구 */
-    private suspend fun charge(ctx: ChargeContext, orderId: String, orderName: String): TossPaymentResponse =
-        chargeOrUnknown(ctx, orderId, orderName)
+    private suspend fun charge(chargeContext: ChargeContext, orderId: String, orderName: String): TossPaymentResponse =
+        chargeOrUnknown(chargeContext, orderId, orderName)
             ?: throw PaymentConfirmFailedException(Errors.Commerce.Payment.TOSS_CONFIRM_FAILED)
 
     /** 결과 불명 허용 토스 빌링 청구 */
-    private suspend fun chargeOrUnknown(ctx: ChargeContext, orderId: String, orderName: String): TossPaymentResponse? {
+    private suspend fun chargeOrUnknown(chargeContext: ChargeContext, orderId: String, orderName: String): TossPaymentResponse? {
         val result = tossPaymentClient.chargeBilling(
-            billingKey = ctx.billingKey,
-            customerKey = ctx.customerKey,
-            amount = ctx.amount.toLong(),
+            billingKey = chargeContext.billingKey,
+            customerKey = chargeContext.customerKey,
+            amount = chargeContext.amount.toLong(),
             orderId = orderId,
             orderName = orderName,
             idempotencyKey = orderId
@@ -299,7 +299,7 @@ class SubscriptionPaymentService(
         return confirmed
     }
 
-    private suspend fun recordSubPayment(
+    private suspend fun recordSubscriptionPayment(
         subscriptionId: Int,
         amount: BigDecimal,
         isRenewal: Boolean,
@@ -310,17 +310,17 @@ class SubscriptionPaymentService(
         val existing = paymentRepository.findByTransactionId(orderId)
         if (existing?.status == PaymentStatus.COMPLETED) return  // 같은 멱등키로 이미 완료
 
-        val paymentId = existing?.id?.value ?: paymentRepository.createSubPayment(
+        val paymentId = existing?.id?.value ?: paymentRepository.createSubscriptionPayment(
             subscriptionId = subscriptionId,
             provider = PaymentProvider.TOSS_BILLING,
             amount = amount,
             isRenewal = isRenewal,
             transactionId = orderId
         ).id.value
-        completeSubPayment(paymentId, confirmed)
+        completeSubscriptionPayment(paymentId, confirmed)
     }
 
-    private suspend fun completeSubPayment(paymentId: Int, confirmed: TossPaymentResponse) {
+    private suspend fun completeSubscriptionPayment(paymentId: Int, confirmed: TossPaymentResponse) {
         paymentRepository.updatePaymentInfo(
             paymentId = paymentId,
             paymentKey = confirmed.paymentKey,

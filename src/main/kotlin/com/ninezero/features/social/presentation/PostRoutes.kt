@@ -10,11 +10,13 @@ import com.ninezero.core.common.util.ApiResponse
 import com.ninezero.core.common.util.PaginatedResponse
 import com.ninezero.core.common.util.apiResponse
 import com.ninezero.core.common.util.authResponse
+import com.ninezero.core.common.util.cursorParams
 import com.ninezero.core.common.util.getIntParam
 import com.ninezero.core.common.util.getOptionalEnumParam
 import com.ninezero.core.common.util.getOptionalStringParam
 import com.ninezero.core.common.util.getRequiredIntParam
 import com.ninezero.core.common.util.getUserIdOrNull
+import com.ninezero.core.common.util.pageParams
 import com.ninezero.core.common.util.receiveFileParts
 import com.ninezero.core.common.util.requireAdminId
 import com.ninezero.core.common.util.requireUserId
@@ -50,14 +52,7 @@ fun Route.postRoutes() {
                 summary = "사용자 포스트 목록 조회 (공개)"
                 tags("Posts")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<Int>("userId") {
                         description = "사용자 ID"
                         required = true
@@ -142,14 +137,7 @@ fun Route.postRoutes() {
                         description = "크리에이터 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
             }) {
@@ -177,14 +165,7 @@ fun Route.postRoutes() {
                         description = "태그 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 apiResponse()
                 response {
@@ -428,14 +409,7 @@ fun Route.postRoutes() {
                 summary = "내 포스트 목록 조회"
                 tags("Posts")
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("sort") {
                         description = "정렬 방식: LATEST (최신순, 기본값), OLDEST (오래된순)"
                         required = false
@@ -462,14 +436,7 @@ fun Route.postRoutes() {
                 summary = "전체 포스트 목록 (Admin)"
                 tags("Posts")
                 request {
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {

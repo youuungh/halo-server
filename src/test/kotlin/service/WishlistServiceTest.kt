@@ -9,7 +9,6 @@ import com.ninezero.features.commerce.data.CartRepositoryImpl
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
 import com.ninezero.features.commerce.data.WishlistRepositoryImpl
 import com.ninezero.features.commerce.domain.WishlistService
-import com.ninezero.features.subscription.data.SubscriptionPlanRepositoryImpl
 import com.ninezero.features.subscription.data.SubscriptionRepositoryImpl
 import com.ninezero.helper.TestDatabase
 import com.ninezero.helper.TestFixtures
@@ -29,6 +28,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.ninezero.features.commerce.domain.ProductAccessService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WishlistServiceTest {
@@ -38,7 +38,6 @@ class WishlistServiceTest {
     private lateinit var productRepository: ProductRepositoryImpl
     private lateinit var cartRepository: CartRepositoryImpl
     private lateinit var subscriptionRepository: SubscriptionRepositoryImpl
-    private lateinit var planRepository: SubscriptionPlanRepositoryImpl
 
     @BeforeAll
     fun setup() {
@@ -49,14 +48,12 @@ class WishlistServiceTest {
             productRepository = ProductRepositoryImpl()
             cartRepository = CartRepositoryImpl()
             subscriptionRepository = SubscriptionRepositoryImpl()
-            planRepository = SubscriptionPlanRepositoryImpl()
 
             wishlistService = WishlistService(
                 wishlistRepository = wishlistRepository,
                 productRepository = productRepository,
                 cartRepository = cartRepository,
-                subscriptionRepository = subscriptionRepository,
-                planRepository = planRepository
+                productAccessService = ProductAccessService(subscriptionRepository)
             )
         }
     }

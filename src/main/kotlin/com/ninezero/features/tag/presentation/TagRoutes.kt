@@ -4,6 +4,7 @@ import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.config.TagTargetType
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.util.ApiResponse
 import com.ninezero.core.common.util.apiResponse
 import com.ninezero.core.common.util.authResponse
@@ -54,13 +55,13 @@ fun Route.tagRoutes() {
             val creatorId = call.getRequiredIntParam("creatorId", Errors.Common.INVALID_CREATOR_ID)
                 ?: return@get
 
-            val targetTypeStr = call.getRequiredStringParam("targetType", Errors.Tag.TAG_TARGET_TYPE_REQUIRED)
+            val rawTargetType = call.getRequiredStringParam("targetType", Errors.Tag.TAG_TARGET_TYPE_REQUIRED)
                 ?: return@get
 
             val targetType = try {
-                TagTargetType.valueOf(targetTypeStr.uppercase())
+                TagTargetType.valueOf(rawTargetType.uppercase())
             } catch (_: Exception) {
-                return@get call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>(Errors.Tag.TAG_TARGET_TYPE_INVALID))
+                throw InvalidInputException(Errors.Tag.TAG_TARGET_TYPE_INVALID)
             }
 
             val response = tagService.getCreatorTags(creatorId, targetType)

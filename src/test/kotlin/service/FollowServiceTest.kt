@@ -6,7 +6,7 @@ import com.ninezero.core.common.exception.ConflictException
 import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.exception.UserNotFoundException
 import com.ninezero.core.common.util.query
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepositoryImpl
 import com.ninezero.features.social.domain.FollowService
 import com.ninezero.features.user.data.BlockedUserRepositoryImpl
@@ -29,7 +29,7 @@ import kotlin.test.assertFailsWith
 class FollowServiceTest {
 
     private lateinit var followService: FollowService
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var cacheService: CacheService
 
     @BeforeAll
@@ -38,9 +38,9 @@ class FollowServiceTest {
             TestDatabase.init()
 
             // Mock 객체 생성 (알림은 성공으로 가정)
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             coJustRun {
-                notificationService.sendFollowNotification(any(), any())
+                notificationSender.sendFollowNotification(any(), any())
             }
 
             cacheService = mockk(relaxed = true)
@@ -50,7 +50,7 @@ class FollowServiceTest {
                 followRepository = FollowRepositoryImpl(),
                 userRepository = UserRepositoryImpl(),
                 blockedUserRepository = BlockedUserRepositoryImpl(),
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
                 cacheService = cacheService
             )
@@ -136,7 +136,7 @@ class FollowServiceTest {
 
             // Then - 알림 전송 확인
             coVerify {
-                notificationService.sendFollowNotification(
+                notificationSender.sendFollowNotification(
                     followerId = follower.id.value,
                     followedId = following.id.value
                 )

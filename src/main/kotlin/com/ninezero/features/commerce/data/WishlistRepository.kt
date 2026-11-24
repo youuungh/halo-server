@@ -18,7 +18,7 @@ data class WishlistToggleResult(
 
 interface WishlistRepository {
 
-    // 위시리스트 생성/삭제
+    // 위시리스트 생성·삭제
     suspend fun deleteWishlist(userId: Int, productId: Int): Boolean
     suspend fun toggleWishlist(
         userId: Int,

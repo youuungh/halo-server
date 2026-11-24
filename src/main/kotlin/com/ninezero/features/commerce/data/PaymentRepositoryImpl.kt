@@ -55,7 +55,7 @@ class PaymentRepositoryImpl : PaymentRepository {
     }
 
     /** 방치된 대기 빌링 구독 결제 조회 */
-    override suspend fun findStalePendingSubPayments(before: LocalDateTime): List<PaymentDao> {
+    override suspend fun findStalePendingSubscriptionPayments(before: LocalDateTime): List<PaymentDao> {
         return PaymentDao.find {
             (PaymentTable.status eq PaymentStatus.PENDING) and
                     (PaymentTable.subscriptionId.isNotNull()) and
@@ -149,7 +149,7 @@ class PaymentRepositoryImpl : PaymentRepository {
     }
 
     /** 구독 결제 생성 */
-    override suspend fun createSubPayment(
+    override suspend fun createSubscriptionPayment(
         subscriptionId: Int,
         provider: PaymentProvider,
         amount: BigDecimal,

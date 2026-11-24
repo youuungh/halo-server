@@ -293,7 +293,7 @@ class SubscriptionPaymentServiceTest {
             val subscriptionId = seedSubscription(user.id.value)
             // 청구 전에 프로세스가 죽어 대기 기록만 남은 상황
             query {
-                paymentRepository.createSubPayment(
+                paymentRepository.createSubscriptionPayment(
                     subscriptionId = subscriptionId,
                     provider = PaymentProvider.TOSS_BILLING,
                     amount = BigDecimal("5000"),

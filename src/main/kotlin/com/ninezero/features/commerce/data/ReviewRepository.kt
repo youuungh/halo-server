@@ -12,7 +12,7 @@ data class ReviewWithAuthor(
 
 interface ReviewRepository {
 
-    // 리뷰 생성/수정/삭제
+    // 리뷰 생성·수정·삭제
     suspend fun createReview(
         userId: Int,
         productId: Int,

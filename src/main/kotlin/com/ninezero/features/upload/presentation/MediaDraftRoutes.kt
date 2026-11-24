@@ -3,6 +3,7 @@ package com.ninezero.features.upload.presentation
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.MediaDraftTargetType
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.InvalidFileException
 import com.ninezero.core.common.util.ApiResponse
 import com.ninezero.core.common.util.authResponse
 import com.ninezero.core.common.util.getOptionalEnumParam
@@ -91,10 +92,7 @@ fun Route.mediaDraftRoutes() {
 
                     val (files, contentTypes) = call.receiveFileParts(StorageConfig.FileSizeLimit.POST)  // 댓글도 같은 한도
                     if (files.isEmpty()) {
-                        return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            ApiResponse.error<Unit>(Errors.File.NO_IMAGE_FILES)
-                        )
+                        throw InvalidFileException(Errors.File.NO_IMAGE_FILES)
                     }
 
                     val response = mediaDraftService.createImageDrafts(userId, targetType, files, contentTypes)

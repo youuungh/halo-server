@@ -18,8 +18,8 @@ import com.ninezero.features.chat.domain.MessageService
 import com.ninezero.features.chat.presentation.models.request.ChatUploadPrepareRequest
 import com.ninezero.features.chat.presentation.models.request.SendMessageRequest
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
-import com.ninezero.features.commerce.domain.ProductService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.commerce.domain.ProductAccessService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.PostRepositoryImpl
 import com.ninezero.features.social.domain.PostService
 import com.ninezero.features.upload.data.MediaUploadRepositoryImpl
@@ -59,8 +59,8 @@ class MessageServiceTest {
     private lateinit var postRepository: PostRepositoryImpl
     private lateinit var blockedUserRepository: BlockedUserRepositoryImpl
     private lateinit var postService: PostService
-    private lateinit var productService: ProductService
-    private lateinit var notificationService: NotificationService
+    private lateinit var productAccessService: ProductAccessService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var webSocketManager: WebSocketManager
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
@@ -80,17 +80,17 @@ class MessageServiceTest {
             postRepository = PostRepositoryImpl()
             blockedUserRepository = BlockedUserRepositoryImpl()
             postService = mockk(relaxed = true)
-            productService = mockk(relaxed = true)
+            productAccessService = mockk(relaxed = true)
 
             // Mock 객체 생성
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             webSocketManager = mockk(relaxed = true)
             fileUploadService = mockk(relaxed = true)
             imageProcessingService = mockk(relaxed = true)
 
             // Mock 동작 정의
             coJustRun {
-                notificationService.sendChatMessageNotification(any(), any(), any(), any())
+                notificationSender.sendChatMessageNotification(any(), any(), any(), any())
             }
 
             coEvery {
@@ -127,8 +127,8 @@ class MessageServiceTest {
                 postRepository = postRepository,
                 postService = postService,
                 blockedUserRepository = blockedUserRepository,
-                productService = productService,
-                notificationService = notificationService,
+                productAccessService = productAccessService,
+                notificationSender = notificationSender,
                 webSocketManager = webSocketManager,
                 fileUploadService = fileUploadService,
                 imageProcessingService = imageProcessingService,
@@ -249,7 +249,7 @@ class MessageServiceTest {
             val creator = TestFixtures.createTestCreator(email = "creator-link@example.com", username = "creatorlink")
             val product = TestFixtures.createTestProduct(creator.id.value)
             val chatRoom = query { chatRepository.getOrCreateChatRoom(sender.id.value, receiver.id.value) }
-            coEvery { productService.getProductAccessMap(any(), any()) } returns mapOf(product.id.value to true)
+            coEvery { productAccessService.getAccessMap(any(), any()) } returns mapOf(product.id.value to true)
             query { blockedUserRepository.createBlock(sender.id.value, creator.id.value) }
 
             val response = messageService.sendMessage(
@@ -514,7 +514,7 @@ class MessageServiceTest {
     @Test
     fun `안 읽은 메시지를 지우면 수신자 안 읽음 수를 되돌린다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
             val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
             val chatRoom = query { chatRepository.getOrCreateChatRoom(user1.id.value, user2.id.value) }
@@ -525,7 +525,7 @@ class MessageServiceTest {
                 SendMessageRequest("곧 지울 메시지", ChatMessageType.TEXT, null, null)
             )
             coVerify(timeout = 2000) {
-                notificationService.sendChatMessageNotification(user2.id.value, user1.id.value, chatRoom.id.value, any())
+                notificationSender.sendChatMessageNotification(user2.id.value, user1.id.value, chatRoom.id.value, any())
             }
 
             messageService.deleteMessage(message.id, user1.id.value)

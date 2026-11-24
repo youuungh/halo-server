@@ -29,6 +29,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import com.ninezero.features.commerce.domain.ProductAccessService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CartServiceTest {
@@ -47,7 +48,7 @@ class CartServiceTest {
             productRepository = ProductRepositoryImpl()
             subscriptionRepository = SubscriptionRepositoryImpl()
             planRepository = SubscriptionPlanRepositoryImpl()
-            cartService = CartService(cartRepository, productRepository, subscriptionRepository, planRepository)
+            cartService = CartService(cartRepository, productRepository, ProductAccessService(subscriptionRepository))
         }
     }
 
@@ -355,7 +356,7 @@ class CartServiceTest {
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
             val repository = spyk(CartRepositoryImpl())
-            val service = CartService(repository, productRepository, subscriptionRepository, planRepository)
+            val service = CartService(repository, productRepository, ProductAccessService(subscriptionRepository))
 
             // 첫 요청이 담긴 수량을 읽은 직후 다른 요청이 상한까지 담음
             val interleaved = AtomicBoolean(false)

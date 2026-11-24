@@ -38,7 +38,7 @@ private data class TossCancelRequest(
 data class TossPaymentResponse(
     val paymentKey: String,
     val orderId: String,
-    val status: String,  // DONE/CANCELED/WAITING_FOR_DEPOSIT 등
+    val status: String,  // DONE·CANCELED·WAITING_FOR_DEPOSIT 등
     val totalAmount: Long,
     val method: String? = null,
     val approvedAt: String? = null,
@@ -90,7 +90,7 @@ sealed interface TossCancelResult {
     ) : TossCancelResult
 }
 
-// 빌링
+// =====  빌링 =====
 
 @Serializable
 private data class BillingIssueRequestBody(val authKey: String, val customerKey: String)

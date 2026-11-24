@@ -1,11 +1,14 @@
 package com.ninezero.features.subscription.data
 
+import com.ninezero.core.common.config.SubscriptionPlanTier
 import com.ninezero.core.common.config.SubscriptionStatus
 import com.ninezero.core.common.util.containsLikePattern
 import com.ninezero.core.common.util.ilike
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.toOffset
 import com.ninezero.core.database.entities.subscription.SubscriptionDao
+import com.ninezero.core.database.entities.subscription.SubscriptionPlanDao
+import com.ninezero.core.database.entities.subscription.SubscriptionPlanTable
 import com.ninezero.core.database.entities.subscription.SubscriptionTable
 import com.ninezero.core.database.entities.user.UserProfileTable
 import com.ninezero.core.database.entities.user.UserTable
@@ -144,6 +147,25 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
                     (SubscriptionTable.creatorId inList creatorIds) and
                     activeCondition(nowUtc())
         }.toList()
+    }
+
+    /** 구독 중인 크리에이터의 플랜 등급, 구독 안 했으면 null */
+    override suspend fun findActiveTier(userId: Int, creatorId: Int): SubscriptionPlanTier? =
+        findActiveSubscription(userId, creatorId)?.let { SubscriptionPlanDao.findById(it.planId)?.tier }
+
+    /** 구독 중인 크리에이터별 플랜 등급 */
+    override suspend fun findActiveTiersByCreators(
+        userId: Int,
+        creatorIds: Collection<Int>
+    ): Map<Int, SubscriptionPlanTier> {
+        val subscriptions = findActiveSubscriptionsByCreators(userId, creatorIds)
+        if (subscriptions.isEmpty()) return emptyMap()
+
+        val tierByPlan = SubscriptionPlanDao.find { SubscriptionPlanTable.id inList subscriptions.map { it.planId }.distinct() }
+            .associate { it.id.value to it.tier }
+        return subscriptions.mapNotNull { subscription ->
+            tierByPlan[subscription.planId]?.let { subscription.creatorId to it }
+        }.toMap()
     }
 
     /** 크리에이터의 유효 구독 목록 조회 */

@@ -62,7 +62,7 @@ data class CreatorProductSales(
 
 interface OrderRepository {
 
-    // 주문 생성/취소
+    // 주문 생성·취소
     suspend fun createOrder(
         userId: Int,
         orderNumber: String,
@@ -123,8 +123,8 @@ interface OrderRepository {
         creatorId: Int,
         shippingStatus: ShippingStatus
     ): OrderShipmentDao?
-    suspend fun setTrackingSubId(orderId: Int, creatorId: Int, subscriptionId: String): OrderShipmentDao?
-    suspend fun clearTrackingSubId(orderId: Int, creatorId: Int): OrderShipmentDao?
+    suspend fun setTrackingSubscriptionId(orderId: Int, creatorId: Int, subscriptionId: String): OrderShipmentDao?
+    suspend fun clearTrackingSubscriptionId(orderId: Int, creatorId: Int): OrderShipmentDao?
 
     // 배송 추적 조회
     suspend fun findShipmentsMissingTrackingSubscription(since: LocalDateTime): List<OrderShipmentDao>

@@ -219,9 +219,9 @@ class MediaDraftService(
         return DraftMedia(
             type = MediaType.VIDEO,
             url = upload.url,
-            width = video.meta.width,
-            height = video.meta.height,
-            durationMs = video.meta.durationMs,
+            width = video.metadata.width,
+            height = video.metadata.height,
+            durationMs = video.metadata.durationMs,
             thumbnailUrl = video.thumbnail?.let { runCatching { fileUploadService.uploadDraftThumbnail(targetType.bucket, userId, it) }.getOrNull() },
             previewUrl = preview?.let { runCatching { fileUploadService.uploadDraftPreview(targetType.bucket, userId, it) }.getOrNull() }
         )

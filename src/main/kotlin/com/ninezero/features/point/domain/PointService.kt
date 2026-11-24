@@ -10,7 +10,7 @@ import com.ninezero.core.database.entities.point.PointDao
 import com.ninezero.core.database.entities.point.PointHistoryDao
 import com.ninezero.core.database.entities.point.PointHistoryTable
 import com.ninezero.core.database.entities.point.PointTable
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.point.data.PointHistoryRepository
 import com.ninezero.features.point.data.PointRepository
 import com.ninezero.features.point.presentation.models.response.PointBalanceResponse
@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.days
 class PointService(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val coroutineScope: CoroutineScope
 ) {
     private val logger = logger()
@@ -39,7 +39,8 @@ class PointService(
     suspend fun createPointAccountInTransaction(userId: Int): PointDao =
         pointRepository.findByUserId(userId) ?: pointRepository.createPointAccount(userId)
 
-    // 잔액
+    // =====  잔액 =====
+
     suspend fun getBalance(userId: Int): PointBalanceResponse {
         return query {
             val point = pointRepository.findByUserId(userId)
@@ -59,7 +60,8 @@ class PointService(
         }
     }
 
-    // 내역
+    // =====  내역 =====
+
     suspend fun getHistory(
         userId: Int,
         page: Int,
@@ -90,15 +92,16 @@ class PointService(
         }
     }
 
-    // 적립
+    // =====  적립 =====
+
     fun earnPointsInTransaction(
         userId: Int,
         amount: BigDecimal,
         orderId: Int,
         description: String
     ): BigDecimal {
-        ValidationUtils.validatePointAmount(amount)
-        ValidationUtils.validatePointReason(description)
+        PointValidation.validatePointAmount(amount)
+        PointValidation.validatePointReason(description)
 
         // 같은 유저의 동시 적립을 직렬화한 뒤 멱등 판정
         val point = PointDao.find { PointTable.userId eq userId }.forUpdate().singleOrNull()
@@ -133,14 +136,15 @@ class PointService(
         return amount
     }
 
-    // 사용
+    // =====  사용 =====
+
     fun usePointsInTransaction(
         userId: Int,
         amount: BigDecimal,
         orderId: Int,
         orderAmount: BigDecimal
     ) {
-        ValidationUtils.validatePointAmount(amount)
+        PointValidation.validatePointAmount(amount)
 
         val point = PointDao.find { PointTable.userId eq userId }.forUpdate().singleOrNull()
             ?.also { it.refresh(flush = false) }
@@ -165,13 +169,14 @@ class PointService(
         }
     }
 
-    // 환불
+    // =====  환불 =====
+
     fun refundPointsInTransaction(
         userId: Int,
         amount: BigDecimal,
         orderId: Int
     ) {
-        ValidationUtils.validatePointAmount(amount)
+        PointValidation.validatePointAmount(amount)
 
         val point = PointDao.find { PointTable.userId eq userId }.forUpdate().singleOrNull()
             ?.also { it.refresh(flush = false) }
@@ -193,7 +198,8 @@ class PointService(
         }
     }
 
-    // 만료
+    // =====  만료 =====
+
     suspend fun expirePoints(): Int {
         val now = nowUtc()
         val batchSize = 100
@@ -238,7 +244,7 @@ class PointService(
                 .mapValues { (_, amounts) -> amounts.fold(BigDecimal.ZERO, BigDecimal::add) }
             expiredByUser.forEach { (userId, amount) ->
                 try {
-                    notificationService.sendPointExpiredNotification(
+                    notificationSender.sendPointExpiredNotification(
                         userId = userId,
                         amount = amount
                     )

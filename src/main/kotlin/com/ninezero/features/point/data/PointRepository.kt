@@ -11,7 +11,7 @@ interface PointRepository {
     // 포인트 계정 생성
     suspend fun createPointAccount(userId: Int): PointDao
 
-    // 포인트 잔액/누적 수정
+    // 포인트 잔액·누적 수정
     suspend fun updateBalance(userId: Int, newBalance: BigDecimal): PointDao?
     suspend fun incrementEarned(userId: Int, amount: BigDecimal)
     suspend fun incrementUsed(userId: Int, amount: BigDecimal)

@@ -63,7 +63,7 @@ import com.ninezero.features.commerce.presentation.models.request.UpdateShipping
 import com.ninezero.features.coupon.data.CouponRepositoryImpl
 import com.ninezero.features.coupon.data.UserCouponRepositoryImpl
 import com.ninezero.features.coupon.domain.CouponRedemptionService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.point.data.PointHistoryRepositoryImpl
 import com.ninezero.features.point.data.PointRepositoryImpl
 import com.ninezero.features.point.domain.PointEarnService
@@ -103,6 +103,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.ninezero.features.commerce.domain.ProductAccessService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OrderServiceTest {
@@ -119,7 +120,7 @@ class OrderServiceTest {
     private lateinit var paymentService: PaymentService
     private lateinit var pointService: PointService
     private lateinit var paymentRepository: PaymentRepositoryImpl
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var tossPaymentClient: TossPaymentClient
     private lateinit var productRepository: ProductRepositoryImpl
     private lateinit var cartRepository: CartRepositoryImpl
@@ -133,8 +134,8 @@ class OrderServiceTest {
         runBlocking {
             TestDatabase.init()
 
-            // Mock 객체 생성 (NotificationService의 모든 메서드를 relaxed로 처리)
-            notificationService = mockk(relaxed = true)
+            // Mock 객체 생성 (NotificationSender의 모든 메서드를 relaxed로 처리)
+            notificationSender = mockk(relaxed = true)
             tossPaymentClient = mockk(relaxed = true)
 
             // 하위 의존성 초기화
@@ -146,7 +147,7 @@ class OrderServiceTest {
             pointService = PointService(
                 pointRepository = pointRepository,
                 pointHistoryRepository = pointHistoryRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
 
@@ -161,8 +162,7 @@ class OrderServiceTest {
             val cartService = CartService(
                 cartRepository = cartRepository,
                 productRepository = productRepository,
-                subscriptionRepository = subscriptionRepository,
-                planRepository = subscriptionPlanRepository
+                productAccessService = ProductAccessService(subscriptionRepository)
             )
 
             val couponRedemptionService = CouponRedemptionService(
@@ -197,11 +197,10 @@ class OrderServiceTest {
                 userRepository = UserRepositoryImpl(),
                 paymentRepository = paymentRepository,
                 pointRepository = pointRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 pointService = pointService,
                 couponRedemptionService = couponRedemptionService,
                 subscriptionRepository = subscriptionRepository,
-                subscriptionPlanRepository = subscriptionPlanRepository,
                 cartService = cartService,
                 tossPaymentClient = tossPaymentClient,
                 orderResponseAssembler = orderResponseAssembler,
@@ -212,7 +211,7 @@ class OrderServiceTest {
                 orderRepository = orderRepository,
                 paymentRepository = paymentRepository,
                 orderResponseAssembler = orderResponseAssembler,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 pointEarnService = pointEarnService,
                 deliveryApiClient = deliveryApiClient,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + backgroundJob)
@@ -458,7 +457,7 @@ class OrderServiceTest {
     @Test
     fun `저장카드 청구 중 주문이 취소되면 늦게 성공한 청구를 토스 취소로 환불한다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -508,7 +507,7 @@ class OrderServiceTest {
             assertEquals("late_billing_key", paymentKey)
             assertEquals(OrderStatus.CANCELLED, orderService.getOrderById(order.id.value, user.id.value).status)
             backgroundJob.children.toList().joinAll()
-            coVerify(exactly = 0) { notificationService.sendOrderCreatedNotification(any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendOrderCreatedNotification(any(), any(), any()) }
         }
     }
 
@@ -561,7 +560,7 @@ class OrderServiceTest {
     @Test
     fun `토스 승인 응답이 유실돼도 재조회로 승인이 확인되면 완료 처리한다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val (orderId, tossOrderId) = prepareTossOrder(user.id.value, creator.id.value)
@@ -583,7 +582,7 @@ class OrderServiceTest {
     @Test
     fun `토스 5xx에 재조회도 실패하면 결과 불명으로 두고 주문을 유지한다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val (orderId, _) = prepareTossOrder(user.id.value, creator.id.value)
@@ -604,7 +603,7 @@ class OrderServiceTest {
     @Test
     fun `토스가 승인을 거절하면 결제 실패로 확정한다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val (orderId, _) = prepareTossOrder(user.id.value, creator.id.value)
@@ -622,7 +621,7 @@ class OrderServiceTest {
     @Test
     fun `토스 승인 중 주문이 취소되면 늦은 승인을 토스 취소로 환불한다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val (orderId, tossOrderId) = prepareTossOrder(user.id.value, creator.id.value)
@@ -658,7 +657,7 @@ class OrderServiceTest {
     @Test
     fun `환불까지 끝난 주문은 다시 결제하지 않고 토스를 부르지 않는다`() {
         runBlocking {
-            clearMocks(tossPaymentClient, notificationService)
+            clearMocks(tossPaymentClient, notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -992,7 +991,7 @@ class OrderServiceTest {
     fun `주문 생성만으로는 주문 알림을 보내지 않는다`() {
         runBlocking {
             // Given
-            clearMocks(notificationService)
+            clearMocks(notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creatorId = creator.id.value)
@@ -1013,8 +1012,8 @@ class OrderServiceTest {
 
             // Then 결제 전이라 구매자·판매자 모두 알림 없음
             backgroundJob.children.toList().joinAll()
-            coVerify(exactly = 0) { notificationService.sendOrderCreatedNotification(any(), any(), any()) }
-            coVerify(exactly = 0) { notificationService.sendOrderReceivedNotification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendOrderCreatedNotification(any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendOrderReceivedNotification(any(), any(), any(), any()) }
         }
     }
 
@@ -1022,7 +1021,7 @@ class OrderServiceTest {
     fun `결제 완료 알림은 구매자와 판매자에게 보낸다`() {
         runBlocking {
             // Given
-            clearMocks(notificationService)
+            clearMocks(notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creatorId = creator.id.value)
@@ -1044,10 +1043,10 @@ class OrderServiceTest {
 
             // Then 비동기 발송이라 대기
             coVerify(timeout = 3000) {
-                notificationService.sendOrderCreatedNotification(user.id.value, order.id, order.orderNumber)
+                notificationSender.sendOrderCreatedNotification(user.id.value, order.id, order.orderNumber)
             }
             coVerify(timeout = 3000) {
-                notificationService.sendOrderReceivedNotification(creator.id.value, user.id.value, order.id, order.orderNumber)
+                notificationSender.sendOrderReceivedNotification(creator.id.value, user.id.value, order.id, order.orderNumber)
             }
         }
     }
@@ -1156,7 +1155,7 @@ class OrderServiceTest {
             assertEquals(PaymentStatus.COMPLETED, order.paymentStatus)
             assertTrue(query { cartRepository.findUserCart(user.id.value) }.isEmpty())
             coVerify(timeout = 3000) {
-                notificationService.sendOrderCreatedNotification(user.id.value, order.id, order.orderNumber)
+                notificationSender.sendOrderCreatedNotification(user.id.value, order.id, order.orderNumber)
             }
         }
     }
@@ -1498,7 +1497,7 @@ class OrderServiceTest {
     @Test
     fun `택배사 기록 전까지 송장을 수정하면 새 번호로 추적하고 변경 알림을 보낸다`() {
         runBlocking {
-            clearMocks(notificationService)
+            clearMocks(notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -1519,10 +1518,10 @@ class OrderServiceTest {
             assertEquals(ShippingStatus.SHIPPED, response.shippingStatus)
             coVerify(exactly = 1) { deliveryApiClient.subscribeTracking(COURIER_CODE, "9876543210", clientId) }
             coVerify(exactly = 1) {
-                notificationService.sendShippingStartedNotification(user.id.value, order.id.value, TRACKING_NUMBER)
+                notificationSender.sendShippingStartedNotification(user.id.value, order.id.value, TRACKING_NUMBER)
             }
             coVerify(exactly = 1) {
-                notificationService.sendTrackingChangedNotification(user.id.value, order.id.value, "한진택배", "9876543210")
+                notificationSender.sendTrackingChangedNotification(user.id.value, order.id.value, "한진택배", "9876543210")
             }
         }
     }
@@ -1717,7 +1716,7 @@ class OrderServiceTest {
     @Test
     fun `미결제 주문 취소는 판매자에게 알리지 않는다`() {
         runBlocking {
-            clearMocks(notificationService)
+            clearMocks(notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -1725,14 +1724,14 @@ class OrderServiceTest {
 
             orderService.cancelOrder(order.id.value, user.id.value, "미결제 자동취소")
 
-            coVerify(exactly = 0) { notificationService.sendOrderCancelledNotification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendOrderCancelledNotification(any(), any(), any(), any()) }
         }
     }
 
     @Test
     fun `결제된 주문 취소는 판매자에게 알린다`() {
         runBlocking {
-            clearMocks(notificationService)
+            clearMocks(notificationSender)
             val creator = TestFixtures.createTestCreator()
             val user = TestFixtures.createTestUser()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -1741,7 +1740,7 @@ class OrderServiceTest {
             orderService.cancelOrder(order.id.value, user.id.value)
 
             coVerify(exactly = 1, timeout = 3000) {
-                notificationService.sendOrderCancelledNotification(creator.id.value, user.id.value, order.id.value, true)
+                notificationSender.sendOrderCancelledNotification(creator.id.value, user.id.value, order.id.value, true)
             }
         }
     }

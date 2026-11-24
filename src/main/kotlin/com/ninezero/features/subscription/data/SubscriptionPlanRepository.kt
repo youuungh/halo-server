@@ -6,7 +6,7 @@ import java.math.BigDecimal
 
 interface SubscriptionPlanRepository {
 
-    // 플랜 생성/수정/삭제
+    // 플랜 생성·수정·삭제
     suspend fun createPlan(
         creatorId: Int,
         name: String,

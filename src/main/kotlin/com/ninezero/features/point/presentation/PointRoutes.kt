@@ -43,14 +43,7 @@ fun Route.pointRoutes() {
                         description = "내역 유형 필터 (EARN/USE/EXPIRE/REFUND, 미지정 시 전체)"
                         required = false
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                     queryParameter<String>("startDate") {
                         description = "조회 시작일 (ISO 8601, 예: 2026-02-01T00:00:00)"
                         required = false

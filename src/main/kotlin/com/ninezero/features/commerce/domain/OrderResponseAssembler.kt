@@ -4,9 +4,7 @@ import com.ninezero.core.common.config.OrderStatus
 import com.ninezero.core.common.config.ShippingStatus
 import com.ninezero.core.common.config.SubscriptionPlanTier
 import com.ninezero.core.common.util.TierAccessEvaluator
-import com.ninezero.core.common.util.calcEarnByTier
 import com.ninezero.core.common.util.decodeJsonToList
-import com.ninezero.core.common.util.getEarnRateForTier
 import com.ninezero.core.common.util.toAmountString
 import com.ninezero.core.database.entities.commerce.OrderDao
 import com.ninezero.core.database.entities.commerce.OrderItemDao
@@ -25,6 +23,8 @@ import com.ninezero.features.commerce.presentation.models.response.OrderItemResp
 import com.ninezero.features.commerce.presentation.models.response.OrderResponse
 import com.ninezero.features.commerce.toOrderItemResponse
 import com.ninezero.features.commerce.toOrderResponse
+import com.ninezero.features.point.domain.calcEarnByTier
+import com.ninezero.features.point.domain.getEarnRateForTier
 import com.ninezero.features.subscription.data.SubscriptionPlanRepository
 import com.ninezero.features.subscription.data.SubscriptionRepository
 import com.ninezero.features.user.data.UserRepository

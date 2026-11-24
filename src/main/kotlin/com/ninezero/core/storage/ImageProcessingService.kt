@@ -120,7 +120,7 @@ class ImageProcessingService {
                 "-quality", "50",
                 "-compression_level", "6",
                 tempOut.absolutePath
-            ).runQuietly()
+            ).runSilently()
             if (succeeded && tempOut.exists() && tempOut.length() > 0) tempOut.readBytes() else null
         } catch (_: Exception) {
             null
@@ -187,7 +187,7 @@ class ImageProcessingService {
                 "-quality", WEBP_QUALITY.toString(),
                 "-compression_level", "6",
                 tempOut.absolutePath
-            ).runQuietly()
+            ).runSilently()
             if (succeeded && tempOut.exists() && tempOut.length() > 0) tempOut.readBytes() else null
         } catch (_: Exception) {
             null
@@ -206,8 +206,8 @@ class ImageProcessingService {
     /** 헤더만 읽어 해상도 반환 */
     private fun readImageDimensions(file: ByteArray): Pair<Int, Int>? {
         return try {
-            val iis = ImageIO.createImageInputStream(ByteArrayInputStream(file)) ?: return null
-            iis.use {
+            val imageInput = ImageIO.createImageInputStream(ByteArrayInputStream(file)) ?: return null
+            imageInput.use {
                 val readers = ImageIO.getImageReaders(it)
                 if (!readers.hasNext()) return@use null
                 val reader = readers.next()
@@ -264,7 +264,7 @@ class ImageProcessingService {
                 "-quality", WEBP_QUALITY.toString(),
                 "-compression_level", "6",
                 tempOut.absolutePath
-            ).runQuietly()
+            ).runSilently()
             if (succeeded && tempOut.exists() && tempOut.length() > 0) tempOut.readBytes() else null
         } catch (_: Exception) {
             null

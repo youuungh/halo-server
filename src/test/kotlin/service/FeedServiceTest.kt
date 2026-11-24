@@ -9,7 +9,7 @@ import com.ninezero.core.database.entities.social.PostDao
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.VideoProcessingService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.*
 import com.ninezero.features.tag.data.TagRepositoryImpl
 import com.ninezero.features.social.domain.FeedService
@@ -49,7 +49,7 @@ class FeedServiceTest {
     private lateinit var blockedUserRepository: BlockedUserRepositoryImpl
 
     // Mock Services
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
     private lateinit var videoProcessingService: VideoProcessingService
@@ -73,7 +73,7 @@ class FeedServiceTest {
             blockedUserRepository = BlockedUserRepositoryImpl()
 
             // Mock Services
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             fileUploadService = mockk(relaxed = true)
             imageProcessingService = mockk(relaxed = true)
             videoProcessingService = mockk(relaxed = true)
@@ -94,7 +94,7 @@ class FeedServiceTest {
                 subscriptionRepository = subscriptionRepository,
                 planRepository = planRepository,
                 blockedUserRepository = blockedUserRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 mediaDraftService = mockk(relaxed = true),
                 fileUploadService = fileUploadService,
                 videoProcessingService = mockk(relaxed = true),
@@ -105,8 +105,6 @@ class FeedServiceTest {
             // FeedService 초기화
             feedService = FeedService(
                 postRepository = postRepository,
-                likeRepository = likeRepository,
-                bookmarkRepository = bookmarkRepository,
                 followRepository = followRepository,
                 hiddenPostRepository = hiddenPostRepository,
                 blockedUserRepository = blockedUserRepository,

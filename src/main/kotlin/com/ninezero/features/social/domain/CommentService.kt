@@ -20,7 +20,7 @@ import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.core.storage.StorageConfig
 import com.ninezero.core.storage.VideoProcessingService
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.batchLoadCommentMediaItems
 import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.data.BookmarkRepository
@@ -52,7 +52,7 @@ class CommentService(
     private val userRepository: UserRepository,
     private val blockedUserRepository: BlockedUserRepository,
     private val followRepository: FollowRepository,
-    private val notificationService: NotificationService,
+    private val notificationSender: NotificationSender,
     private val postService: PostService,
     private val mediaDraftService: MediaDraftService,
     private val fileUploadService: FileUploadService,
@@ -63,7 +63,8 @@ class CommentService(
 ) {
     private val logger = logger()
 
-    // 댓글 작성
+    // =====  댓글 작성 =====
+
     suspend fun createComment(
         userId: Int,
         postId: Int,
@@ -74,8 +75,8 @@ class CommentService(
     ): CommentResponse {
         val trimmedContent = content.trim()
 
-        ValidationUtils.validateCommentContent(trimmedContent)
-        ValidationUtils.validateClientRequestId(clientRequestId)
+        SocialValidation.validateCommentContent(trimmedContent)
+        SocialValidation.validateClientRequestId(clientRequestId)
 
         // 같은 요청이 반복되면 만든 댓글을 그대로
         clientRequestId?.let { requestId ->
@@ -156,7 +157,7 @@ class CommentService(
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
                 if (parentCommentId != null && parentCommentOwnerId != null) {
-                    notificationService.sendReplyNotification(
+                    notificationSender.sendReplyNotification(
                         commentOwnerId = parentCommentOwnerId,
                         replierId = userId,
                         postId = postId,
@@ -164,7 +165,7 @@ class CommentService(
                         parentCommentId = parentCommentId
                     )
                 } else {
-                    notificationService.sendCommentNotification(
+                    notificationSender.sendCommentNotification(
                         postOwnerId = postOwnerId,
                         commenterId = userId,
                         postId = postId,
@@ -193,7 +194,7 @@ class CommentService(
                     }
 
                     mentionTargets.forEach { (mentionedUserId, canViewContent) ->
-                        notificationService.sendMentionNotification(
+                        notificationSender.sendMentionNotification(
                             mentionedUserId = mentionedUserId,
                             mentionerId = userId,
                             postId = postId,
@@ -394,17 +395,18 @@ class CommentService(
         }
     }
 
-    // 댓글 수정/삭제
+    // =====  댓글 수정·삭제 =====
+
     suspend fun updateComment(
         commentId: Int,
         userId: Int,
         content: String
     ): CommentResponse {
         val trimmedContent = content.trim()
-        ValidationUtils.validateCommentContent(trimmedContent)
+        SocialValidation.validateCommentContent(trimmedContent)
 
         return query {
-            verifyCommentOwnership(  // 작성자만
+            requireOwnedComment(  // 작성자만
                 commentId = commentId,
                 userId = userId,
                 errorMessage = Errors.Social.Comment.COMMENT_UPDATE_PERMISSION_DENIED
@@ -473,7 +475,8 @@ class CommentService(
         cacheService.deletePattern(CacheKeys.Patterns.userScoped(userId))
     }
 
-    // 사용자 댓글 스레드
+    // =====  사용자 댓글 스레드 =====
+
     suspend fun getUserCommentThreads(
         userId: Int,
         currentUserId: Int?,
@@ -558,21 +561,8 @@ class CommentService(
             val commentMediaItemsMap = batchLoadCommentMediaItems(allCommentIds)
             val postMediaItemsMap = batchLoadPostMediaItems(postIds)
 
-            // 접근 권한 없으면 excerpt/미디어 제거
-            val postAccessMap = if (currentUserId != null) {
-                postService.checkMultiplePostAccess(currentUserId, posts)
-            } else {
-                posts.associate {
-                    it.id.value to TierAccessEvaluator.canAccess(
-                        viewerId = null,
-                        ownerId = it.userId,
-                        creatorId = it.creatorId,
-                        requiredTier = it.requiredTier,
-                        isSecret = it.isSecret,
-                        viewerTier = null
-                    )
-                }
-            }
+            // 접근 권한 없으면 excerpt·미디어 제거
+            val postAccessMap = postService.checkMultiplePostAccess(currentUserId, posts)
 
             val threads = userComments.mapNotNull { userComment ->
                 val post = postMap[userComment.postId] ?: return@mapNotNull null
@@ -648,7 +638,7 @@ class CommentService(
                 val postAuthor = userMap[post.userId]?.toUserSummaryResponse(isFollowing = followStatusMap[post.userId])
                     ?: return@mapNotNull null
 
-                // 삭제/숨김/잠금이면 excerpt/미디어 제거
+                // 삭제·숨김·잠금이면 excerpt·미디어 제거
                 val hideContent = isPostDeleted || isPostHidden || !canAccessPost
                 val postSummary = CommentPostSummaryResponse(
                     id = post.id.value,
@@ -683,7 +673,8 @@ class CommentService(
         }
     }
 
-    // 댓글 미디어
+    // =====  댓글 미디어 =====
+
     /** 미디어 포함 댓글 수정 */
     suspend fun updateCommentWithMedia(
         commentId: Int,
@@ -699,7 +690,7 @@ class CommentService(
 
         try {
             val finalContent = content?.trim()
-            finalContent?.let { ValidationUtils.validateCommentContent(it) }
+            finalContent?.let { SocialValidation.validateCommentContent(it) }
 
             // 수정은 사진 파일 파트만
             val files = newFiles.orEmpty()
@@ -707,7 +698,7 @@ class CommentService(
             validateImageParts(imageProcessingService, files, contentTypes, StorageConfig.FileSizeLimit.COMMENT)
 
             val (orderedKeepItemIds, contentToUse, deleteItemIds) = query {
-                val comment = verifyCommentOwnership(  // 작성자만
+                val comment = requireOwnedComment(  // 작성자만
                     commentId = commentId,
                     userId = userId,
                     errorMessage = Errors.Social.Comment.COMMENT_UPDATE_PERMISSION_DENIED
@@ -734,7 +725,7 @@ class CommentService(
             prepared = prepareNewMedia(userId, files)
 
             val response = query {
-                verifyCommentOwnership(
+                requireOwnedComment(
                     commentId = commentId,
                     userId = userId,
                     errorMessage = Errors.Social.Comment.COMMENT_UPDATE_PERMISSION_DENIED
@@ -802,7 +793,7 @@ class CommentService(
         )
     }
 
-    private suspend fun verifyCommentOwnership(
+    private suspend fun requireOwnedComment(
         commentId: Int,
         userId: Int,
         errorMessage: String

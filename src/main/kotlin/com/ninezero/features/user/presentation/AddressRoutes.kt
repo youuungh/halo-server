@@ -36,7 +36,7 @@ fun Route.addressRoutes() {
                 }
             }) {
                 val userId = call.requireUserId() ?: return@get
-                val response = addressService.findAddresses(userId)
+                val response = addressService.getAddresses(userId)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
@@ -65,7 +65,7 @@ fun Route.addressRoutes() {
             }) {
                 val userId = call.requireUserId() ?: return@get
                 val id = call.getRequiredIntParam("id", Errors.Address.INVALID_ADDRESS_ID) ?: return@get
-                val response = addressService.findAddress(id, userId)
+                val response = addressService.getAddress(id, userId)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 

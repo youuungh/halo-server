@@ -88,7 +88,7 @@ class ProductRepositoryImpl : ProductRepository {
     /** 크리에이터 상품 목록 조회 */
     override suspend fun findProductsByCreator(creatorId: Int, page: Int, limit: Int, sort: ProductSortType): List<ProductDao> {
         return ProductDao.find { (ProductTable.creatorId eq creatorId) and (ProductTable.isActive eq true) }  // 삭제 상품 제외, 개수와 같은 조건
-            .orderBy(  // sort별 최신순/가격순
+            .orderBy(  // sort별 최신순·가격순
                 when (sort) {
                     ProductSortType.LATEST -> ProductTable.createdAt to SortOrder.DESC
                     ProductSortType.PRICE_LOW -> ProductTable.price to SortOrder.ASC

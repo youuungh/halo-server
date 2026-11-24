@@ -61,14 +61,7 @@ fun Route.adminReportRoutes() {
                         description = "POST/COMMENT/USER, 생략 시 전체"
                         required = false
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
             }) {
@@ -78,7 +71,7 @@ fun Route.adminReportRoutes() {
                 val page = call.getIntParam("page", 1)
                 val limit = call.getIntParam("limit", Constants.DEFAULT_PAGE_LIMIT)
 
-                val response = reportService.findReportedTargets(targetType, page, limit)
+                val response = reportService.getReportedTargets(targetType, page, limit)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
@@ -107,7 +100,7 @@ fun Route.adminReportRoutes() {
 
                 call.respond(
                     HttpStatusCode.OK,
-                    ApiResponse.success(reportService.findReportedTargetDetail(targetType, targetId))
+                    ApiResponse.success(reportService.getReportedTargetDetail(targetType, targetId))
                 )
             }
 

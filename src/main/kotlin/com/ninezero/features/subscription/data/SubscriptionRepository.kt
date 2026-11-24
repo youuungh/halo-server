@@ -1,12 +1,13 @@
 package com.ninezero.features.subscription.data
 
+import com.ninezero.core.common.config.SubscriptionPlanTier
 import com.ninezero.core.common.config.SubscriptionStatus
 import com.ninezero.core.database.entities.subscription.SubscriptionDao
 import kotlinx.datetime.LocalDateTime
 
 interface SubscriptionRepository {
 
-    // 구독 생성/수정/삭제
+    // 구독 생성·수정·삭제
     suspend fun createSubscription(
         userId: Int,
         creatorId: Int,
@@ -26,11 +27,13 @@ interface SubscriptionRepository {
     suspend fun findActiveSubscription(userId: Int, creatorId: Int): SubscriptionDao?
     suspend fun findActiveSubscriptionsByCreators(userId: Int, creatorIds: Collection<Int>): List<SubscriptionDao>
     suspend fun findActiveSubscriptionsByCreators(userIds: Collection<Int>, creatorIds: Collection<Int>): List<SubscriptionDao>
+    suspend fun findActiveTier(userId: Int, creatorId: Int): SubscriptionPlanTier?
+    suspend fun findActiveTiersByCreators(userId: Int, creatorIds: Collection<Int>): Map<Int, SubscriptionPlanTier>
 
     // 구독자 조회
     suspend fun findCreatorSubscribers(creatorId: Int, page: Int, limit: Int): List<SubscriptionDao>
 
-    // 검색 포함 구독자 조회/카운트
+    // 검색 포함 구독자 조회·카운트
     suspend fun findCreatorSubscribersWithSearch(creatorId: Int, search: String, page: Int, limit: Int): List<Int>
     suspend fun countCreatorSubscribersWithSearch(creatorId: Int, search: String): Int
 

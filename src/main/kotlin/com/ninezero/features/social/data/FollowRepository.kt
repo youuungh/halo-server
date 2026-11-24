@@ -5,7 +5,7 @@ import com.ninezero.core.database.entities.social.FollowDao
 
 interface FollowRepository {
 
-    // 팔로우 생성/삭제
+    // 팔로우 생성·삭제
     suspend fun createFollow(followerId: Int, followingId: Int): FollowDao?
     suspend fun deleteFollow(followerId: Int, followingId: Int): Boolean
 
@@ -20,7 +20,7 @@ interface FollowRepository {
     suspend fun findFollowingIds(userId: Int): List<Int>
     suspend fun findFollowingIdsByUserIds(userIds: Collection<Int>, limitPerUser: Int): Map<Int, List<Int>>
 
-    // 검색 포함 팔로우 조회/카운트
+    // 검색 포함 팔로우 조회·카운트
     suspend fun findFollowersWithSearch(userId: Int, search: String, cursor: PageCursor?, limit: Int): List<FollowDao>
     suspend fun findFollowingWithSearch(userId: Int, search: String, cursor: PageCursor?, limit: Int): List<FollowDao>
     suspend fun countFollowersWithSearch(userId: Int, search: String): Int

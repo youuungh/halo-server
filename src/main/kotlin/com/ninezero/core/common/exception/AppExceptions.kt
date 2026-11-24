@@ -2,14 +2,14 @@ package com.ninezero.core.common.exception
 
 import io.ktor.http.*
 
-// 기본 예외
+// ===== 기본 예외 =====
 
 sealed class AppException(
     message: String,
     val statusCode: HttpStatusCode
 ) : Exception(message)
 
-// 400 잘못된 요청 예외
+// ===== 400 잘못된 요청 예외 =====
 
 class InvalidInputException(message: String) : AppException(message, HttpStatusCode.BadRequest)
 
@@ -39,23 +39,24 @@ class InvalidCouponCodeException(message: String) : AppException(message, HttpSt
 // 파일 업로드 관련
 class InvalidImageUrlException(message: String) : AppException(message, HttpStatusCode.BadRequest)
 class InvalidFileException(message: String) : AppException(message, HttpStatusCode.BadRequest)
+class UnsupportedMediaTypeException(message: String) : AppException(message, HttpStatusCode.UnsupportedMediaType)
 
 // Search 관련
 class InvalidSearchQueryException(message: String) : AppException(message, HttpStatusCode.BadRequest)
 
-// 401 인증 실패 예외
+// =====  401 인증 실패 예외 =====
 
 class InvalidCredentialsException(message: String = Errors.User.INVALID_CREDENTIALS) : AppException(message, HttpStatusCode.Unauthorized)
 class TokenExpiredException(message: String) : AppException(message, HttpStatusCode.Unauthorized)
 class SocialOnlyAccountException(message: String = Errors.User.SOCIAL_ONLY_ACCOUNT) : AppException(message, HttpStatusCode.Unauthorized)
 
-// 403 권한 없음 예외
+// =====  403 권한 없음 예외 =====
 
 class ForbiddenException(message: String) : AppException(message, HttpStatusCode.Forbidden)
 class CreatorOnlyException(message: String = Errors.User.CREATOR_ONLY) : AppException(message, HttpStatusCode.Forbidden)
 class UserBlockedException(message: String) : AppException(message, HttpStatusCode.Forbidden)
 
-// 404 리소스 없음 예외
+// =====  404 리소스 없음 예외 =====
 
 class NotFoundException(message: String) : AppException(message, HttpStatusCode.NotFound)
 
@@ -85,7 +86,7 @@ class TagNotFoundException(message: String) : AppException(message, HttpStatusCo
 class SubscriptionNotFoundException(subscriptionId: Int) : AppException("구독 ID $subscriptionId 를 찾을 수 없습니다", HttpStatusCode.NotFound)
 class SubscriptionPlanNotFoundException(planId: Int) : AppException("구독 플랜 ID $planId 를 찾을 수 없습니다", HttpStatusCode.NotFound)
 
-// 409 충돌 예외
+// =====  409 충돌 예외 =====
 
 class ConflictException(message: String) : AppException(message, HttpStatusCode.Conflict)
 class DuplicateEmailException(message: String = Errors.User.DUPLICATE_EMAIL) : AppException(message, HttpStatusCode.Conflict)
@@ -93,7 +94,7 @@ class DuplicateUsernameException(message: String = Errors.User.DUPLICATE_USERNAM
 class EmptyCartException(message: String) : AppException(message, HttpStatusCode.Conflict)
 class PostPinLimitExceededException(message: String) : AppException(message, HttpStatusCode.Conflict)
 
-// 422 처리 불가 예외
+// =====  422 처리 불가 예외 =====
 
 class ValidationException(message: String) : AppException(message, HttpStatusCode.UnprocessableEntity)
 class InsufficientStockException(message: String) : AppException(message, HttpStatusCode.UnprocessableEntity)
@@ -113,11 +114,11 @@ class PaymentAmountMismatchException(message: String) : AppException(message, Ht
 class PaymentConfirmFailedException(message: String) : AppException(message, HttpStatusCode.UnprocessableEntity)
 class BillingKeyRequiredException(message: String) : AppException(message, HttpStatusCode.UnprocessableEntity)
 
-// 429 요청 초과 예외
+// =====  429 요청 초과 예외 =====
 
 class TooManyRequestsException(message: String) : AppException(message, HttpStatusCode.TooManyRequests)
 
-// 500 서버 오류 예외
+// =====  500 서버 오류 예외 =====
 
 class InternalServerException(message: String) : AppException(message, HttpStatusCode.InternalServerError)
 class PaymentResultUnknownException(message: String = Errors.Commerce.Payment.PAYMENT_RESULT_UNKNOWN) : AppException(message, HttpStatusCode.InternalServerError)

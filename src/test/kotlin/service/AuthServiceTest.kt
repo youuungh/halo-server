@@ -6,7 +6,7 @@ import com.ninezero.core.common.exception.*
 import com.ninezero.core.common.util.nowUtc
 import com.ninezero.core.common.util.query
 import com.ninezero.core.email.EmailService
-import com.ninezero.core.security.PasswordManager
+import com.ninezero.core.security.PasswordHasher
 import com.ninezero.features.point.data.PointHistoryRepositoryImpl
 import com.ninezero.features.point.data.PointRepositoryImpl
 import com.ninezero.features.point.domain.PointService
@@ -15,6 +15,8 @@ import com.ninezero.features.user.data.SocialAccountRepositoryImpl
 import com.ninezero.features.user.data.UserRepositoryImpl
 import com.ninezero.features.user.data.UserSessionRepositoryImpl
 import com.ninezero.features.user.domain.AuthService
+import com.ninezero.features.user.domain.PasswordResetService
+import com.ninezero.features.user.domain.UserSessionService
 import com.ninezero.features.user.presentation.models.request.LoginRequest
 import com.ninezero.features.user.presentation.models.request.RegisterRequest
 import com.ninezero.features.user.presentation.models.request.VerifyEmailCodeRequest
@@ -40,6 +42,8 @@ import kotlin.test.assertTrue
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AuthServiceTest {
     private lateinit var authService: AuthService
+    private lateinit var passwordResetService: PasswordResetService
+    private lateinit var userSessionService: UserSessionService
     private lateinit var userRepository: UserRepositoryImpl
     private lateinit var userSessionRepository: UserSessionRepositoryImpl
     private lateinit var refreshTokenRepository: RefreshTokenRepositoryImpl
@@ -64,7 +68,15 @@ class AuthServiceTest {
             pointService = PointService(
                 pointRepository = PointRepositoryImpl(),
                 pointHistoryRepository = PointHistoryRepositoryImpl(),
-                notificationService = mockk(relaxed = true),
+                notificationSender = mockk(relaxed = true),
+                coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+            )
+
+            userSessionService = UserSessionService(
+                userSessionRepository = userSessionRepository,
+                userRepository = userRepository,
+                refreshTokenRepository = refreshTokenRepository,
+                webSocketManager = mockk(relaxed = true),
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
 
@@ -74,12 +86,18 @@ class AuthServiceTest {
                 refreshTokenRepository = refreshTokenRepository,
                 emailService = emailService,
                 pointService = pointService,
-                coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
                 socialAccountRepository = SocialAccountRepositoryImpl(),
-                socialTokenVerifiers = emptyList(),
                 fileUploadService = mockk(relaxed = true),
                 cacheService = CacheService(),
                 accountCleanupService = TestFixtures.accountCleanupService(),
+                webSocketManager = mockk(relaxed = true),
+                userSessionService = userSessionService
+            )
+
+            passwordResetService = PasswordResetService(
+                userRepository = userRepository,
+                emailService = emailService,
+                userSessionService = userSessionService,
                 webSocketManager = mockk(relaxed = true)
             )
         }
@@ -377,19 +395,19 @@ class AuthServiceTest {
     fun `비밀번호 재설정 실패 - 5회 틀리면 시도 횟수 초과`() {
         runBlocking {
             TestFixtures.createTestUser(email = "test@example.com")
-            authService.requestPasswordReset("test@example.com")
+            passwordResetService.requestPasswordReset("test@example.com")
             val code = passwordResetCodeSlot.captured
             val wrongCode = if (code == "AAAAAA") "BBBBBB" else "AAAAAA"
 
             repeat(Constants.User.RESET_CODE_MAX_ATTEMPTS) {
                 assertFailsWith<InvalidInputException> {
-                    authService.verifyResetCode("test@example.com", wrongCode)
+                    passwordResetService.verifyResetCode("test@example.com", wrongCode)
                 }
             }
 
             // 맞는 코드여도 막히고 초과 문구
             val error = assertFailsWith<InvalidInputException> {
-                authService.verifyResetCode("test@example.com", code)
+                passwordResetService.verifyResetCode("test@example.com", code)
             }
             assertEquals(Errors.User.RESET_CODE_ATTEMPTS_EXCEEDED, error.message)
         }
@@ -399,7 +417,7 @@ class AuthServiceTest {
     fun `비밀번호 재설정 요청 실패 - 존재하지 않는 이메일`() {
         runBlocking {
             assertFailsWith<UserNotFoundByEmailException> {
-                authService.requestPasswordReset("notexist@example.com")
+                passwordResetService.requestPasswordReset("notexist@example.com")
             }
         }
     }
@@ -418,29 +436,29 @@ class AuthServiceTest {
             )
 
             // 인증 코드 발송 → 발송 mock에서 코드 캡처
-            authService.requestPasswordReset("test@example.com")
+            passwordResetService.requestPasswordReset("test@example.com")
             val code = passwordResetCodeSlot.captured
 
             // 코드 검증 → 재설정 토큰 발급
-            val resetToken = authService.verifyResetCode("test@example.com", code).resetToken
+            val resetToken = passwordResetService.verifyResetCode("test@example.com", code).resetToken
             val storedToken = query { userRepository.findUserByEmail("test@example.com")!!.passwordResetToken }
             assertNotEquals(resetToken, storedToken, "재설정 토큰은 원문으로 저장하지 않는다")
 
-            authService.resetPassword(resetToken, "NewPassword123!")
+            passwordResetService.resetPassword(resetToken, "NewPassword123!")
 
             // 새 비밀번호로 확인
             val updatedUser = query {
                 userRepository.findUserByEmail("test@example.com")
             }
             assertTrue(
-                PasswordManager.verifyPassword("NewPassword123!", updatedUser!!.passwordHash!!),
+                PasswordHasher.verifyPassword("NewPassword123!", updatedUser!!.passwordHash!!),
                 "새 비밀번호가 설정되어야 합니다"
             )
 
             // 전 기기 로그아웃은 기기 목록·푸시 토큰까지
             query {
                 assertTrue(userSessionRepository.findUserSessions(updatedUser.id.value).isEmpty())
-                assertTrue(userRepository.getDeviceFidsForUser(updatedUser.id.value).isEmpty())
+                assertTrue(userRepository.findDeviceFidsForUser(updatedUser.id.value).isEmpty())
             }
         }
     }
@@ -450,11 +468,11 @@ class AuthServiceTest {
         runBlocking {
             TestFixtures.createTestUser(email = "test@example.com")
 
-            authService.requestPasswordReset("test@example.com")
+            passwordResetService.requestPasswordReset("test@example.com")
 
             // 쿨다운(60초) 내 재요청 → 429
             assertFailsWith<TooManyRequestsException> {
-                authService.requestPasswordReset("test@example.com")
+                passwordResetService.requestPasswordReset("test@example.com")
             }
         }
     }
@@ -482,8 +500,8 @@ class AuthServiceTest {
 
             // 비밀번호 재설정 코드
             TestFixtures.createTestUser(email = "reset@example.com", username = "resetuser")
-            assertFailsWith<EmailSendException> { authService.requestPasswordReset("reset@example.com") }
-            authService.requestPasswordReset("reset@example.com")
+            assertFailsWith<EmailSendException> { passwordResetService.requestPasswordReset("reset@example.com") }
+            passwordResetService.requestPasswordReset("reset@example.com")
         }
     }
 
@@ -492,13 +510,13 @@ class AuthServiceTest {
         runBlocking {
             TestFixtures.createTestUser(email = "test@example.com", password = "OldPassword123!")
 
-            authService.requestPasswordReset("TEST@Example.com")
-            val resetToken = authService.verifyResetCode("Test@example.COM", passwordResetCodeSlot.captured).resetToken
-            authService.resetPassword(resetToken, "NewPassword123!")
+            passwordResetService.requestPasswordReset("TEST@Example.com")
+            val resetToken = passwordResetService.verifyResetCode("Test@example.COM", passwordResetCodeSlot.captured).resetToken
+            passwordResetService.resetPassword(resetToken, "NewPassword123!")
 
             // 대소문자가 달라도 끝까지 같은 계정의 비밀번호가 바뀜
             val updatedUser = query { userRepository.findUserByEmail("test@example.com") }
-            assertTrue(PasswordManager.verifyPassword("NewPassword123!", updatedUser!!.passwordHash!!))
+            assertTrue(PasswordHasher.verifyPassword("NewPassword123!", updatedUser!!.passwordHash!!))
         }
     }
 

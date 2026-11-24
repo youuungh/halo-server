@@ -11,7 +11,7 @@ import com.ninezero.core.database.entities.social.PostDao
 
 interface PostRepository {
 
-    // 포스트 생성/수정/삭제
+    // 포스트 생성·수정·삭제
     suspend fun createPost(
         userId: Int,
         content: String,
@@ -42,7 +42,7 @@ interface PostRepository {
 
     suspend fun deletePost(postId: Int): Boolean
 
-    // 크리에이터 해제/복귀
+    // 크리에이터 해제·복귀
     suspend fun hideCreatorPosts(creatorId: Int): List<Int>
     suspend fun restoreCreatorHiddenPosts(creatorId: Int): List<Int>
 

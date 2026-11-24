@@ -258,7 +258,7 @@ class ReportServiceTest {
     @Test
     fun `신고 대상 목록은 0 이하 page와 음수 limit을 기본값으로 보정한다`() {
         runBlocking {
-            val response = reportService.findReportedTargets(targetType = null, page = 0, limit = -5)
+            val response = reportService.getReportedTargets(targetType = null, page = 0, limit = -5)
 
             assertEquals(1, response.page)
         }

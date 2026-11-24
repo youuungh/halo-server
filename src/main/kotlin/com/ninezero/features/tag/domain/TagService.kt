@@ -6,7 +6,6 @@ import com.ninezero.core.common.exception.ConflictException
 import com.ninezero.core.common.exception.CreatorOnlyException
 import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.exception.TagNotFoundException
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.tag.TagDao
 import com.ninezero.features.tag.data.TagRepository
@@ -23,7 +22,7 @@ class TagService(
 ) {
 
     suspend fun createTag(creatorId: Int, request: TagRequest): TagResponse {
-        ValidationUtils.validateTagName(request.name)
+        TagValidation.validateTagName(request.name)
 
         val tag = query {
             val user = userRepository.findUserById(creatorId)
@@ -71,11 +70,11 @@ class TagService(
 
     suspend fun updateTag(tagId: Int, creatorId: Int, request: UpdateTagRequest): TagResponse {
         request.name?.let { newName ->
-            ValidationUtils.validateTagName(newName)
+            TagValidation.validateTagName(newName)
         }
 
         val (updatedTag, count) = query {
-            val tag = verifyTagOwnership(tagId, creatorId)
+            val tag = requireOwnedTag(tagId, creatorId)
 
             request.name?.let { newName ->
                 val existing = tagRepository.findTagByName(creatorId, newName, tag.targetType)
@@ -103,7 +102,7 @@ class TagService(
 
     suspend fun deleteTag(tagId: Int, creatorId: Int) {
         val deleted = query {
-            verifyTagOwnership(tagId, creatorId)
+            requireOwnedTag(tagId, creatorId)
 
             if (tagRepository.countPostsByTag(tagId) > 0 || tagRepository.countProductsByTag(tagId) > 0) {
                 throw ConflictException(Errors.Tag.TAG_IN_USE)
@@ -117,7 +116,7 @@ class TagService(
         }
     }
 
-    private suspend fun verifyTagOwnership(tagId: Int, creatorId: Int): TagDao {
+    private suspend fun requireOwnedTag(tagId: Int, creatorId: Int): TagDao {
         val tag = tagRepository.findTagById(tagId)
             ?: throw TagNotFoundException(Errors.Tag.TAG_NOT_FOUND)
         if (tag.creatorId != creatorId) {

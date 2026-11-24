@@ -6,7 +6,7 @@ import com.ninezero.features.chat.data.ChatRepositoryImpl
 import com.ninezero.features.chat.data.MessageRepositoryImpl
 import com.ninezero.features.chat.domain.MessageService
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepositoryImpl
 import com.ninezero.features.social.data.PostRepositoryImpl
 import com.ninezero.features.share.domain.ShareService
@@ -37,7 +37,7 @@ import kotlin.test.assertFailsWith
 class ShareServiceTest {
 
     private lateinit var shareService: ShareService
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var messageService: MessageService
 
     @BeforeAll
@@ -51,11 +51,11 @@ class ShareServiceTest {
             val messageRepository = MessageRepositoryImpl()
             val userRepository = UserRepositoryImpl()
             val followRepository = FollowRepositoryImpl()
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             messageService = mockk(relaxed = true)
 
             coJustRun {
-                notificationService.sendChatMessageNotification(any(), any(), any(), any())
+                notificationSender.sendChatMessageNotification(any(), any(), any(), any())
             }
 
             shareService = ShareService(
@@ -63,7 +63,7 @@ class ShareServiceTest {
                 productRepository = productRepository,
                 chatRepository = chatRepository,
                 messageRepository = messageRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 userRepository = userRepository,
                 followRepository = followRepository,
                 blockedUserRepository = BlockedUserRepositoryImpl(),
@@ -90,7 +90,7 @@ class ShareServiceTest {
     @Test
     fun `공유 메시지는 수신자에게 실시간으로 한 번만 전달된다`() {
         runBlocking {
-            clearMocks(messageService, notificationService, answers = false)
+            clearMocks(messageService, notificationSender, answers = false)
             val sharer = TestFixtures.createTestUser(email = "s3@example.com", username = "s3")
             val recipient = TestFixtures.createTestUser(email = "s4@example.com", username = "s4")
             TestFixtures.createTestFollow(sharer.id.value, recipient.id.value)
@@ -110,7 +110,7 @@ class ShareServiceTest {
                 messageService.pushToReceiver(recipient.id.value, match { it.size == 2 })
             }
             coVerify(exactly = 1) {
-                notificationService.sendChatMessageNotification(recipient.id.value, sharer.id.value, any(), any())
+                notificationSender.sendChatMessageNotification(recipient.id.value, sharer.id.value, any(), any())
             }
         }
     }

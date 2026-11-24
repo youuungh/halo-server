@@ -1,20 +1,19 @@
 package com.ninezero.features.user.domain
 
-import com.auth0.jwt.exceptions.JWTVerificationException
 import com.ninezero.core.cache.CacheKeys
 import com.ninezero.core.cache.CacheService
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
-import com.ninezero.core.common.config.SocialProvider
 import com.ninezero.core.common.config.UserRole
 import com.ninezero.core.common.exception.*
-import com.ninezero.core.common.util.*
-import com.ninezero.core.database.entities.user.UserDao
+import com.ninezero.core.common.util.CommonValidation
+import com.ninezero.core.common.util.logger
+import com.ninezero.core.common.util.nowUtc
+import com.ninezero.core.common.util.query
 import com.ninezero.core.database.entities.user.UserProfileDao
 import com.ninezero.core.database.entities.user.UserProfileTable
 import com.ninezero.core.email.EmailService
-import com.ninezero.core.security.JwtConfig
-import com.ninezero.core.security.PasswordManager
+import com.ninezero.core.security.PasswordHasher
 import com.ninezero.core.security.TokenHasher
 import com.ninezero.core.storage.FileUploadService
 import com.ninezero.core.websocket.WebSocketManager
@@ -23,29 +22,19 @@ import com.ninezero.features.user.data.RefreshTokenRepository
 import com.ninezero.features.user.data.SocialAccountRepository
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.data.UserSessionRepository
-import com.ninezero.features.user.domain.social.SocialTokenVerifier
 import com.ninezero.features.user.presentation.models.request.ChangePasswordRequest
 import com.ninezero.features.user.presentation.models.request.LoginRequest
 import com.ninezero.features.user.presentation.models.request.RegisterRequest
-import com.ninezero.features.user.presentation.models.request.SocialCompleteRequest
-import com.ninezero.features.user.presentation.models.request.SocialLoginRequest
 import com.ninezero.features.user.presentation.models.request.VerifyEmailCodeRequest
 import com.ninezero.features.user.presentation.models.response.AuthResponse
 import com.ninezero.features.user.presentation.models.response.RefreshTokenResponse
 import com.ninezero.features.user.presentation.models.response.RegisterResponse
-import com.ninezero.features.user.presentation.models.response.SocialLoginResponse
 import com.ninezero.features.user.presentation.models.response.UserResponse
-import com.ninezero.features.user.presentation.models.response.VerifyResetCodeResponse
 import com.ninezero.features.user.toUserResponse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.exposed.v1.core.eq
-import java.security.SecureRandom
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -60,19 +49,12 @@ class AuthService(
     private val pointService: PointService,
     private val accountCleanupService: AccountCleanupService,
     private val emailService: EmailService,
-    private val coroutineScope: CoroutineScope,
-    private val socialTokenVerifiers: List<SocialTokenVerifier>,
     private val fileUploadService: FileUploadService,
     private val cacheService: CacheService,
-    private val webSocketManager: WebSocketManager
+    private val webSocketManager: WebSocketManager,
+    private val userSessionService: UserSessionService
 ) {
     private val logger = logger()
-    private val secureRandom = SecureRandom()
-
-    private data class UserEmailInfo(val userId: Int, val email: String, val username: String)
-
-    /** 발송 실패 시 되돌릴 직전 발송 기록 */
-    private data class CodeSendState(val sentCount: Int, val lastSentAt: LocalDateTime?)
 
     /** 트랜잭션 밖 판정용 값 스냅샷 */
     private data class RefreshTokenSnapshot(
@@ -85,11 +67,11 @@ class AuthService(
 
     /** 회원가입 1단계 인증 코드 발송 */
     suspend fun register(request: RegisterRequest): RegisterResponse {
-        ValidationUtils.validatePassword(request.password)  // 계정 생성은 verifyEmailCode 담당
-        val email = ValidationUtils.normalizeEmail(request.email)
-        val username = ValidationUtils.normalizeUsername(request.username)
+        CommonValidation.validatePassword(request.password)  // 계정 생성은 verifyEmailCode 담당
+        val email = CommonValidation.normalizeEmail(request.email)
+        val username = UserValidation.normalizeUsername(request.username)
 
-        val passwordHash = PasswordManager.hashPassword(request.password)
+        val passwordHash = PasswordHasher.hashPassword(request.password)
         val code = generateVerificationCode()
 
         val previousSend = query {
@@ -103,10 +85,10 @@ class AuthService(
             val existing = userRepository.findPendingSignupByEmail(email)
             val lastSentAt = existing?.lastSentAt
 
-            val cooldownThreshold = Clock.System.now()
-                .minus(Constants.User.SIGNUP_CODE_RESEND_COOLDOWN_SECONDS.seconds)
+            val waitUntil = Clock.System.now()
+                .minus(Constants.User.SIGNUP_CODE_RESEND_WAIT_SECONDS.seconds)
                 .toLocalDateTime(TimeZone.UTC)
-            if (lastSentAt != null && lastSentAt > cooldownThreshold) {
+            if (lastSentAt != null && lastSentAt > waitUntil) {
                 throw TooManyRequestsException(Errors.User.SIGNUP_CODE_RESEND_TOO_SOON)
             }
 
@@ -162,7 +144,7 @@ class AuthService(
         ipAddress: String
     ): AuthResponse {
         val createdUserId = query {
-            val pending = userRepository.findPendingSignupByEmail(ValidationUtils.normalizeEmail(request.email))
+            val pending = userRepository.findPendingSignupByEmail(CommonValidation.normalizeEmail(request.email))
                 ?: throw InvalidInputException(Errors.User.SIGNUP_NOT_FOUND)
 
             val now = nowUtc()
@@ -208,7 +190,7 @@ class AuthService(
             userId
         } ?: throw InvalidInputException(Errors.User.SIGNUP_CODE_INVALID)
 
-        return establishSession(
+        return userSessionService.establishSession(
             userId = createdUserId,
             deviceId = request.deviceId,
             fid = request.fid,
@@ -218,7 +200,7 @@ class AuthService(
     }
 
     suspend fun resendVerificationEmail(email: String): String {
-        val normalizedEmail = ValidationUtils.normalizeEmail(email)
+        val normalizedEmail = CommonValidation.normalizeEmail(email)
         val (username, code, previousSend) = query {
             val pending = userRepository.findPendingSignupByEmail(normalizedEmail)
                 ?: throw InvalidInputException(Errors.User.SIGNUP_NOT_FOUND)
@@ -228,10 +210,10 @@ class AuthService(
             }
 
             val lastSentAt = pending.lastSentAt
-            val cooldownThreshold = Clock.System.now()
-                .minus(Constants.User.SIGNUP_CODE_RESEND_COOLDOWN_SECONDS.seconds)
+            val waitUntil = Clock.System.now()
+                .minus(Constants.User.SIGNUP_CODE_RESEND_WAIT_SECONDS.seconds)
                 .toLocalDateTime(TimeZone.UTC)
-            if (lastSentAt != null && lastSentAt > cooldownThreshold) {
+            if (lastSentAt != null && lastSentAt > waitUntil) {
                 throw TooManyRequestsException(Errors.User.SIGNUP_CODE_RESEND_TOO_SOON)
             }
 
@@ -276,19 +258,20 @@ class AuthService(
         return Messages.Auth.VERIFICATION_EMAIL_SENT
     }
 
-    // 로그인
+    // =====  로그인 =====
+
     suspend fun login(
         request: LoginRequest,
         userAgent: String,
         ipAddress: String
     ): AuthResponse {
         val userId = query {
-            val user = userRepository.findUserByEmail(ValidationUtils.normalizeEmail(request.email))
+            val user = userRepository.findUserByEmail(CommonValidation.normalizeEmail(request.email))
                 ?: throw InvalidCredentialsException()
 
             // null은 간편로그인 전용
             val passwordHash = user.passwordHash ?: throw SocialOnlyAccountException()
-            if (!PasswordManager.verifyPassword(request.password, passwordHash)) {
+            if (!PasswordHasher.verifyPassword(request.password, passwordHash)) {
                 throw InvalidCredentialsException()
             }
 
@@ -299,7 +282,7 @@ class AuthService(
             user.id.value
         }
 
-        return establishSession(
+        return userSessionService.establishSession(
             userId = userId,
             deviceId = request.deviceId,
             fid = request.fid,
@@ -308,264 +291,8 @@ class AuthService(
         )
     }
 
-    /** 로그인 공통 세션 수립 */
-    private suspend fun establishSession(
-        userId: Int,
-        deviceId: String?,
-        fid: String?,
-        userAgent: String,
-        ipAddress: String
-    ): AuthResponse {
-        val deviceInfo = UserAgentParser.parse(userAgent)  // 호출 전 자격 검증 완료 전제
+    // =====  토큰 재발급·로그아웃 =====
 
-        val (response, sessionId, removedSessionIds) = query {
-            val user = userRepository.findUserById(userId)
-                ?: throw UserNotFoundException(userId)
-
-            // 같은 기기면 세션 재사용
-            val existingSession = deviceId?.let {
-                userSessionRepository.findByDevice(user.id.value, it)
-            }
-            val sessionId = if (existingSession != null) {
-                userSessionRepository.updateSessionOnLogin(
-                    sessionId = existingSession.sessionId,
-                    userAgent = userAgent,
-                    ipAddress = ipAddress,
-                    deviceType = deviceInfo.deviceType,
-                    browser = deviceInfo.browser,
-                    os = deviceInfo.os
-                )
-                // 이전 refresh token 무효화
-                refreshTokenRepository.revokeBySession(existingSession.sessionId)
-                existingSession.sessionId
-            } else {
-                val newSessionId = UUID.randomUUID().toString()
-                userSessionRepository.createSession(
-                    userId = user.id.value,
-                    sessionId = newSessionId,
-                    userAgent = userAgent,
-                    ipAddress = ipAddress,
-                    deviceType = deviceInfo.deviceType,
-                    browser = deviceInfo.browser,
-                    os = deviceInfo.os,
-                    deviceId = deviceId
-                )
-                newSessionId
-            }
-
-            // 오래된 세션 정리 + 밀려난 세션 토큰 무효화
-            val removedSessions = userSessionRepository.deleteOldSessions(
-                userId = user.id.value,
-                keepCount = Constants.User.MAX_ACTIVE_SESSIONS
-            )
-            removedSessions.forEach { removed ->
-                refreshTokenRepository.revokeBySession(removed.sessionId)
-                removed.deviceId?.let { userRepository.deleteDeviceToken(user.id.value, it) }  // 밀려난 기기로 푸시가 가지 않게
-            }
-            val removedSessionIds = removedSessions.map { it.sessionId }
-
-            // 소유 이전으로 알림 누수 방지
-            if (fid != null && deviceId != null) {
-                userRepository.registerDeviceToken(user.id.value, deviceId, fid)
-            }
-
-            val (accessToken, refreshToken) = issueTokens(user, sessionId)
-
-            // 비동기 location 갱신용
-            Triple(
-                AuthResponse(
-                    user = user.toUserResponse(),
-                    accessToken = accessToken,
-                    refreshToken = refreshToken,
-                    expiresIn = Constants.User.ACCESS_TOKEN_VALIDITY_MINUTES * 60L
-                ),
-                sessionId,
-                removedSessionIds
-            )
-        }
-
-        // 커밋 뒤 소켓 종료
-        removedSessionIds.forEach { webSocketManager.disconnectSession(it) }
-
-        // location은 백그라운드
-        coroutineScope.launch {
-            try {
-                val location = withTimeoutOrNull(3.seconds) {
-                    IpLocationUtil.getLocationFromIp(ipAddress)
-                }
-                if (location != null) {
-                    query { userSessionRepository.updateLocation(sessionId, location) }
-                }
-            } catch (e: Exception) {
-                logger.warn("세션 location 업데이트 실패 - sessionId: $sessionId, error: ${e.message}")
-            }
-        }
-
-        return response
-    }
-
-    /** 간편로그인 */
-    suspend fun socialLogin(
-        request: SocialLoginRequest,
-        userAgent: String,
-        ipAddress: String
-    ): SocialLoginResponse {
-        val provider = parseProvider(request.provider)
-        val verifier = socialTokenVerifiers.firstOrNull { it.provider == provider }
-            ?: throw InvalidInputException(Errors.User.UNSUPPORTED_SOCIAL_PROVIDER)
-
-        val identity = verifier.verify(request.token)
-
-        // 기존 매핑 → 로그인
-        val linkedUserId = query {
-            socialAccountRepository.findUserIdByProvider(provider, identity.providerUserId)?.also { userId ->
-                val user = userRepository.findUserById(userId)
-                    ?: throw UserNotFoundException(userId)
-                if (!user.isActive) {
-                    throw ForbiddenException(Errors.User.ACCOUNT_DISABLED)
-                }
-            }
-        }
-        if (linkedUserId != null) {
-            val auth = establishSession(linkedUserId, request.deviceId, request.fid, userAgent, ipAddress)
-            return SocialLoginResponse(needsUsername = false, auth = auth)
-        }
-
-        val email = identity.email?.let(ValidationUtils::normalizeEmail)
-            ?: throw InvalidInputException(Errors.User.SOCIAL_EMAIL_REQUIRED)
-
-        // 미검증 이메일은 신규가입 불가
-        if (!identity.emailVerified) {
-            throw ForbiddenException(Errors.User.SOCIAL_EMAIL_NOT_VERIFIED)
-        }
-
-        // 같은 이메일 계정 거부, 자동 연동 재도입 금지
-        if (query { userRepository.existsByEmail(email) }) {
-            throw DuplicateEmailException()
-        }
-
-        // 신규는 확정 전까지 DB 무기록
-        val signupToken = JwtConfig.makeSocialSignupToken(
-            provider = provider.name,
-            providerUserId = identity.providerUserId,
-            email = email,
-            name = identity.name,
-            picture = identity.picture
-        )
-        val suggestedUsername = query { suggestUsername(email) }
-
-        return SocialLoginResponse(
-            needsUsername = true,
-            signupToken = signupToken,
-            suggestedUsername = suggestedUsername
-        )
-    }
-
-    /** 간편로그인 가입 확정 */
-    suspend fun socialComplete(
-        request: SocialCompleteRequest,
-        userAgent: String,
-        ipAddress: String
-    ): AuthResponse {
-        val decoded = try {
-            JwtConfig.socialSignupVerifier.verify(request.signupToken)
-        } catch (e: JWTVerificationException) {
-            throw TokenExpiredException(Errors.User.INVALID_SIGNUP_TOKEN)
-        }
-
-        val provider = parseProvider(decoded.getClaim("provider").asString().orEmpty())
-        val providerUserId = decoded.getClaim("providerUserId").asString()
-            ?: throw TokenExpiredException(Errors.User.INVALID_SIGNUP_TOKEN)
-        val email = decoded.getClaim("email").asString()
-            ?: throw TokenExpiredException(Errors.User.INVALID_SIGNUP_TOKEN)
-        val name = decoded.getClaim("name").asString()
-        val picture = decoded.getClaim("picture").asString()
-
-        val username = ValidationUtils.normalizeUsername(request.username)
-        ValidationUtils.validateUsername(username)
-
-        val userId = query {
-            // 발급 이후 상태 변경 대비 재검사
-            if (socialAccountRepository.findUserIdByProvider(provider, providerUserId) != null) {
-                throw ConflictException(Errors.User.SOCIAL_ALREADY_REGISTERED)
-            }
-            if (userRepository.existsByEmail(email)) {
-                throw DuplicateEmailException()
-            }
-            if (userRepository.existsByUsername(username)) {
-                throw DuplicateUsernameException()
-            }
-
-            val user = userRepository.createUser(
-                email = email,
-                passwordHash = null,
-                username = username
-            )
-            socialAccountRepository.create(user.id.value, provider, providerUserId)
-
-            // displayName은 소셜 이름
-            UserProfileDao.new {
-                this.userId = user.id
-                this.displayName = (name ?: username).take(Constants.User.MAX_DISPLAY_NAME_LENGTH)
-                this.bio = null
-                this.avatarUrl = null
-                this.location = null
-                this.website = null
-            }
-
-            pointService.createPointAccountInTransaction(user.id.value)
-            user.id.value
-        }
-
-        // 실패해도 가입 진행
-        if (picture != null) {
-            fileUploadService.uploadAvatarFromUrl(userId, picture)?.let { avatar ->
-                query {
-                    UserProfileDao.find { UserProfileTable.userId eq userId }.firstOrNull()?.apply {
-                        avatarUrl = avatar.avatarUrl
-                        avatarThumbUrl = avatar.avatarThumbUrl
-                    }
-                }
-            }
-        }
-
-        return establishSession(userId, request.deviceId, request.fid, userAgent, ipAddress)
-    }
-
-    private fun parseProvider(value: String): SocialProvider =
-        SocialProvider.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
-            ?: throw InvalidInputException(Errors.User.UNSUPPORTED_SOCIAL_PROVIDER)
-
-    /** 추천 username 생성, 트랜잭션 안에서만 호출 */
-    private suspend fun suggestUsername(email: String): String {
-        val base = email.substringBefore("@")
-            .lowercase()
-            .filter { it.isLetterOrDigit() || it == '_' }
-            .take(Constants.User.MAX_USERNAME_LENGTH)
-
-        val first = padToMinUsernameLength(base)
-        if (!userRepository.existsByUsername(first)) return first
-
-        repeat(5) {
-            val suffix = randomDigits(4)
-            val candidate = padToMinUsernameLength(
-                base.take(Constants.User.MAX_USERNAME_LENGTH - suffix.length) + suffix
-            )
-            if (!userRepository.existsByUsername(candidate)) return candidate
-        }
-
-        // 사실상 도달하지 않는 fallback
-        return "user${randomDigits(8)}"
-    }
-
-    private fun padToMinUsernameLength(value: String): String =
-        if (value.length >= Constants.User.MIN_USERNAME_LENGTH) value
-        else value + randomDigits(Constants.User.MIN_USERNAME_LENGTH - value.length)
-
-    private fun randomDigits(count: Int): String =
-        buildString { repeat(count) { append(secureRandom.nextInt(10)) } }
-
-    // 토큰 재발급/로그아웃
     suspend fun refreshAccessToken(refreshToken: String): RefreshTokenResponse {
         val snapshot = query {  // 실패 경로는 별도 트랜잭션 커밋
             refreshTokenRepository.findByToken(refreshToken)?.let {
@@ -575,7 +302,7 @@ class AuthService(
 
         if (snapshot.expiresAt < nowUtc()) {
             // 만료 시 FCM 토큰 정리 + 소켓 종료
-            query { clearDeviceTokenForSession(snapshot.sessionId) }
+            query { userSessionService.clearDeviceTokenForSession(snapshot.sessionId) }
             webSocketManager.disconnectSession(snapshot.sessionId)
             throw TokenExpiredException(Errors.User.EXPIRED_REFRESH_TOKEN)
         }
@@ -594,7 +321,7 @@ class AuthService(
                     query {
                         refreshTokenRepository.revokeBySession(snapshot.sessionId)
                         // 탈취 의심 시 FCM 토큰도 정리
-                        clearDeviceTokenForSession(snapshot.sessionId)
+                        userSessionService.clearDeviceTokenForSession(snapshot.sessionId)
                     }
                     webSocketManager.disconnectSession(snapshot.sessionId)
                 }
@@ -620,7 +347,7 @@ class AuthService(
             }
             refreshTokenRepository.markRotated(refreshToken, nowUtc())
             userSessionRepository.updateLastActive(snapshot.sessionId)  // 기기 목록 활동 시각·밀어내기 기준
-            val (newAccessToken, newRefreshToken) = issueTokens(user, snapshot.sessionId)
+            val (newAccessToken, newRefreshToken) = userSessionService.issueTokens(user, snapshot.sessionId)
             RefreshTokenResponse(
                 accessToken = newAccessToken,
                 refreshToken = newRefreshToken,
@@ -629,204 +356,19 @@ class AuthService(
         }
     }
 
-    /** 로그인·토큰 재발급 공용 발급 */
-    private suspend fun issueTokens(
-        user: UserDao,
-        sessionId: String
-    ): Pair<String, String> {
-        val accessToken = JwtConfig.makeAccessToken(
-            userId = user.id.value,
-            email = user.email,
-            username = user.username,
-            role = user.role.name,
-            sessionId = sessionId
-        )
-
-        val refreshToken = JwtConfig.makeRefreshToken()
-        val refreshExpiresAt = Clock.System.now()
-            .plus(Constants.User.REFRESH_TOKEN_VALIDITY_DAYS.days)
-            .toLocalDateTime(TimeZone.UTC)
-        refreshTokenRepository.create(
-            userId = user.id.value,
-            sessionId = sessionId,
-            token = refreshToken,
-            expiresAt = refreshExpiresAt
-        )
-
-        return accessToken to refreshToken
-    }
-
     /** 로그아웃과 기기 토큰 정리 */
     suspend fun logout(userId: Int, sessionId: String) {
         query {
             refreshTokenRepository.revokeBySession(sessionId)
-            clearDeviceTokenForSession(sessionId)
+            userSessionService.clearDeviceTokenForSession(sessionId)
             userSessionRepository.deleteUserSession(userId, sessionId)  // 기기 목록·기기 수 한도에서 제외
         }
         // 열린 소켓으로 알림 새는 것 방지
         webSocketManager.disconnectSession(sessionId)
     }
 
-    private suspend fun clearDeviceTokenForSession(sessionId: String) {
-        val session = userSessionRepository.findSessionById(sessionId) ?: return  // 세션 무효화 시 호출
-        session.deviceId?.let { deviceId ->
-            userRepository.deleteDeviceToken(session.userId, deviceId)
-        }
-    }
+    // =====  내 계정 =====
 
-    /** 남길 세션 외 기기의 토큰·세션·푸시 토큰 정리, null이면 전 기기 */
-    private suspend fun signOutDevices(userId: Int, keepSessionId: String?) {
-        if (keepSessionId == null) {
-            refreshTokenRepository.revokeAllByUser(userId)
-            userSessionRepository.deleteAllByUser(userId)
-            userRepository.deleteAllDeviceTokensForUser(userId)
-        } else {
-            refreshTokenRepository.revokeAllByUserExcept(userId, keepSessionId)
-            userSessionRepository.deleteAllByUserExcept(userId, keepSessionId).forEach { removed ->
-                removed.deviceId?.let { userRepository.deleteDeviceToken(userId, it) }
-            }
-        }
-    }
-
-    /** 비밀번호 재설정 코드 발송 */
-    suspend fun requestPasswordReset(email: String): String {
-        val (userInfo, resetCode, previousSend) = query {
-            val foundUser = userRepository.findUserByEmail(ValidationUtils.normalizeEmail(email))
-                ?: throw UserNotFoundByEmailException(email)
-
-            // 간편로그인 전용 계정은 비밀번호 없음
-            if (foundUser.passwordHash == null) {
-                throw SocialOnlyAccountException()
-            }
-
-            val lastSentAt = foundUser.passwordResetCodeLastSentAt
-
-            val cooldownThreshold = Clock.System.now()
-                .minus(Constants.User.RESET_CODE_RESEND_COOLDOWN_SECONDS.seconds)
-                .toLocalDateTime(TimeZone.UTC)
-            if (lastSentAt != null && lastSentAt > cooldownThreshold) {
-                throw TooManyRequestsException(Errors.User.RESET_CODE_RESEND_TOO_SOON)
-            }
-
-            // 시간당 전송 상한 확인
-            val windowThreshold = Clock.System.now().minus(1.hours).toLocalDateTime(TimeZone.UTC)
-            val sentCount = if (lastSentAt != null && lastSentAt > windowThreshold) {
-                foundUser.passwordResetCodeSentCount
-            } else 0
-            if (sentCount >= Constants.User.RESET_CODE_MAX_SENDS_PER_HOUR) {
-                throw TooManyRequestsException(Errors.User.RESET_CODE_SEND_LIMIT_EXCEEDED)
-            }
-
-            val code = generateVerificationCode()
-            val codeExpiry = Clock.System.now()
-                .plus(Constants.User.RESET_CODE_VALIDITY_MINUTES.minutes)
-                .toLocalDateTime(TimeZone.UTC)
-
-            userRepository.savePasswordResetCode(
-                userId = foundUser.id.value,
-                codeHash = TokenHasher.hash(code),
-                expiry = codeExpiry,
-                sentCount = sentCount + 1,
-                lastSentAt = nowUtc()
-            )
-
-            Triple(UserEmailInfo(foundUser.id.value, foundUser.email, foundUser.username), code, CodeSendState(sentCount, lastSentAt))
-        }
-
-        val result = emailService.sendPasswordResetEmail(
-            email = userInfo.email,
-            username = userInfo.username,
-            code = resetCode
-        )
-
-        if (result.isFailure) {
-            // 못 보낸 발송은 쿨다운·시간당 상한에서 제외
-            query { userRepository.restorePasswordResetCodeSend(userInfo.userId, previousSend.sentCount, previousSend.lastSentAt) }
-            throw EmailSendException(Errors.User.EMAIL_SEND_FAILED)
-        }
-
-        return Messages.Auth.PASSWORD_RESET_EMAIL_SENT
-    }
-
-    /** 코드 검증 후 재설정 토큰 발급 */
-    suspend fun verifyResetCode(email: String, code: String): VerifyResetCodeResponse {
-        val resetToken = query {
-            val user = userRepository.findUserByEmail(ValidationUtils.normalizeEmail(email))
-                ?: throw UserNotFoundByEmailException(email)
-
-            val storedHash = user.passwordResetCode
-                ?: throw InvalidInputException(Errors.User.RESET_CODE_NOT_FOUND)
-
-            val expiry = user.passwordResetCodeExpiry
-            if (expiry == null || expiry < nowUtc()) {
-                throw TokenExpiredException(Errors.User.RESET_CODE_EXPIRED)
-            }
-
-            if (user.passwordResetCodeAttempts >= Constants.User.RESET_CODE_MAX_ATTEMPTS) {
-                throw InvalidInputException(Errors.User.RESET_CODE_ATTEMPTS_EXCEEDED)
-            }
-
-            // 실패 횟수 커밋 후 throw
-            if (TokenHasher.hash(code.uppercase()) != storedHash) {
-                userRepository.incrementPasswordResetCodeAttempts(user.id.value)
-                return@query null
-            }
-
-            // 코드 폐기 후 재설정 토큰 발급
-            userRepository.clearPasswordResetCode(user.id.value)
-
-            val token = UUID.randomUUID().toString()
-            val tokenExpiry = Clock.System.now()
-                .plus(Constants.User.RESET_TOKEN_VALIDITY_MINUTES.minutes)
-                .toLocalDateTime(TimeZone.UTC)
-            userRepository.setPasswordResetToken(
-                userId = user.id.value,
-                token = token,
-                expiry = tokenExpiry
-            )
-
-            token
-        }
-
-        return VerifyResetCodeResponse(resetToken ?: throw InvalidInputException(Errors.User.RESET_CODE_INVALID))
-    }
-
-    private fun generateVerificationCode(): String =
-        (1..Constants.User.VERIFICATION_CODE_LENGTH)
-            .map { Constants.User.VERIFICATION_CODE_CHARSET[secureRandom.nextInt(Constants.User.VERIFICATION_CODE_CHARSET.length)] }  // 혼동 문자 제외 charset
-            .joinToString("")
-
-    /** 재설정 토큰으로 새 비밀번호 저장 */
-    suspend fun resetPassword(token: String, newPassword: String): String {
-        ValidationUtils.validatePassword(newPassword, "새 비밀번호")
-
-        val userId = query {
-            val user = userRepository.findByPasswordResetToken(token)
-                ?: throw InvalidInputException(Errors.User.RESET_TOKEN_INVALID)
-
-            val tokenExpiry = user.passwordResetTokenExpiry
-            if (tokenExpiry == null || tokenExpiry < nowUtc()) {
-                throw TokenExpiredException(Errors.User.RESET_TOKEN_EXPIRED)
-            }
-
-            val passwordHash = PasswordManager.hashPassword(newPassword)
-            userRepository.updatePassword(user.id.value, passwordHash)
-
-            userRepository.clearPasswordResetToken(user.id.value)
-            userRepository.clearPasswordResetCode(user.id.value)
-
-            // 전 기기 로그아웃
-            signOutDevices(user.id.value, keepSessionId = null)
-            user.id.value
-        }
-
-        // 열린 소켓도 종료
-        webSocketManager.disconnectUser(userId)
-
-        return Messages.Auth.PASSWORD_RESET_SUCCESS
-    }
-
-    // 내 계정
     suspend fun getCurrentUser(userId: Int): UserResponse = query {
         val user = userRepository.findUserById(userId)
             ?: throw UserNotFoundException(userId)
@@ -835,7 +377,7 @@ class AuthService(
 
     /** 비밀번호 변경과 다른 기기 로그아웃 */
     suspend fun changePassword(userId: Int, sessionId: String?, request: ChangePasswordRequest): String {
-        ValidationUtils.validatePassword(request.newPassword, "새 비밀번호")
+        CommonValidation.validatePassword(request.newPassword, "새 비밀번호")
 
         query {
             val user = userRepository.findUserById(userId)
@@ -845,7 +387,7 @@ class AuthService(
             val passwordHash = user.passwordHash ?: throw SocialOnlyAccountException()
 
             // 401은 토큰 재발급 유발이라 400
-            if (!PasswordManager.verifyPassword(request.currentPassword, passwordHash)) {
+            if (!PasswordHasher.verifyPassword(request.currentPassword, passwordHash)) {
                 throw InvalidPasswordException(Errors.User.CURRENT_PASSWORD_MISMATCH)
             }
 
@@ -853,9 +395,9 @@ class AuthService(
                 throw InvalidPasswordException(Errors.User.NEW_PASSWORD_SAME_AS_CURRENT)
             }
 
-            userRepository.updatePassword(userId, PasswordManager.hashPassword(request.newPassword))
+            userRepository.updatePassword(userId, PasswordHasher.hashPassword(request.newPassword))
 
-            signOutDevices(userId, keepSessionId = sessionId)
+            userSessionService.signOutDevices(userId, keepSessionId = sessionId)
         }
 
         // 커밋 뒤 소켓 종료
@@ -926,7 +468,8 @@ class AuthService(
         return Messages.Auth.ACCOUNT_DELETED
     }
 
-    // 만료 데이터 정리
+    // =====  만료 데이터 정리 =====
+
     suspend fun cleanupExpiredRefreshTokens(): Int = query {
         refreshTokenRepository.deleteExpired(nowUtc())
     }

@@ -112,7 +112,7 @@ enum class NotificationCategory {
 }
 
 /** 알림 targetType 문자열 상수 */
-object NotificationTargetType {     // deepLink 문자열 연산용
+object NotificationTargetType {
     const val USER = "USER"
     const val POST = "POST"
     const val COMMENT = "COMMENT"

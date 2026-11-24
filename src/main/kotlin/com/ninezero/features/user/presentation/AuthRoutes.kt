@@ -3,8 +3,11 @@ package com.ninezero.features.user.presentation
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.Messages
 import com.ninezero.core.common.exception.Errors
+import com.ninezero.core.common.exception.ForbiddenException
 import com.ninezero.core.common.util.*
 import com.ninezero.features.user.domain.AuthService
+import com.ninezero.features.user.domain.PasswordResetService
+import com.ninezero.features.user.domain.SocialAuthService
 import com.ninezero.features.user.domain.UserService
 import com.ninezero.features.user.domain.UserSessionService
 import com.ninezero.features.user.presentation.models.request.*
@@ -30,6 +33,8 @@ import org.koin.ktor.ext.inject
 fun Route.authRoutes() {
     route(Constants.Endpoints.AUTH) {
         val authService by inject<AuthService>()
+        val socialAuthService by inject<SocialAuthService>()
+        val passwordResetService by inject<PasswordResetService>()
         val userService by inject<UserService>()
         val userSessionService by inject<UserSessionService>()
 
@@ -200,7 +205,7 @@ fun Route.authRoutes() {
                 val userAgent = call.request.userAgent() ?: "Unknown"
                 val ipAddress = call.request.origin.remoteAddress
 
-                val response = authService.socialLogin(request, userAgent, ipAddress)
+                val response = socialAuthService.socialLogin(request, userAgent, ipAddress)
                 val message = if (response.needsUsername) null else Messages.Auth.LOGIN_SUCCESS  // 온보딩 필요면 아직 로그인 전
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response, message))
             }
@@ -239,7 +244,7 @@ fun Route.authRoutes() {
                 val userAgent = call.request.userAgent() ?: "Unknown"
                 val ipAddress = call.request.origin.remoteAddress
 
-                val response = authService.socialComplete(request, userAgent, ipAddress)
+                val response = socialAuthService.socialComplete(request, userAgent, ipAddress)
 
                 call.respond(
                     HttpStatusCode.Created,
@@ -307,7 +312,7 @@ fun Route.authRoutes() {
                 }
             }) {
                 val request = call.receive<ForgotPasswordRequest>()
-                val response = authService.requestPasswordReset(request.email)
+                val response = passwordResetService.requestPasswordReset(request.email)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
@@ -345,7 +350,7 @@ fun Route.authRoutes() {
                 }
             }) {
                 val request = call.receive<VerifyResetCodeRequest>()
-                val response = authService.verifyResetCode(request.email, request.code)
+                val response = passwordResetService.verifyResetCode(request.email, request.code)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
 
@@ -376,7 +381,7 @@ fun Route.authRoutes() {
                 }
             }) {
                 val request = call.receive<ResetPasswordRequest>()
-                val response = authService.resetPassword(request.token, request.newPassword)
+                val response = passwordResetService.resetPassword(request.token, request.newPassword)
                 call.respond(HttpStatusCode.OK, ApiResponse.success(response))
             }
         }
@@ -450,41 +455,43 @@ fun Route.authRoutes() {
                 call.respond(HttpStatusCode.OK, ApiResponse.success(message = Messages.Auth.LOGOUT_SUCCESS))
             }
 
-            post("/change-password", {
-                summary = "비밀번호 변경"
-                tags("Auth")
-                description = "현재 비밀번호 확인 후 변경, 다른 기기 전부 로그아웃"
-                request {
-                    body<ChangePasswordRequest> {
-                        description = "현재 비밀번호 + 새 비밀번호"
-                        required = true
-                        example("default") {
-                            value = ChangePasswordRequest(
-                                currentPassword = "OldP@ss123!",
-                                newPassword = "NewP@ss456!"
-                            )
+            rateLimit(RateLimitName("auth")) {
+                post("/change-password", {
+                    summary = "비밀번호 변경"
+                    tags("Auth")
+                    description = "현재 비밀번호 확인 후 변경, 다른 기기 전부 로그아웃"
+                    request {
+                        body<ChangePasswordRequest> {
+                            description = "현재 비밀번호 + 새 비밀번호"
+                            required = true
+                            example("default") {
+                                value = ChangePasswordRequest(
+                                    currentPassword = "OldP@ss123!",
+                                    newPassword = "NewP@ss456!"
+                                )
+                            }
                         }
                     }
-                }
-                authResponse()
-                response {
-                    code(HttpStatusCode.OK) {
-                        description = "비밀번호 변경 성공"
-                        body<ApiResponse<String>>()
+                    authResponse()
+                    response {
+                        code(HttpStatusCode.OK) {
+                            description = "비밀번호 변경 성공"
+                            body<ApiResponse<String>>()
+                        }
+                        code(HttpStatusCode.BadRequest) {
+                            description = "현재 비밀번호 불일치 또는 새 비밀번호가 현재와 같음"
+                        }
+                        code(HttpStatusCode.Unauthorized) {
+                            description = "간편로그인 전용 계정"
+                        }
                     }
-                    code(HttpStatusCode.BadRequest) {
-                        description = "현재 비밀번호 불일치 또는 새 비밀번호가 현재와 같음"
-                    }
-                    code(HttpStatusCode.Unauthorized) {
-                        description = "간편로그인 전용 계정"
-                    }
-                }
-            }) {
-                val userId = call.requireUserId() ?: return@post
-                val request = call.receive<ChangePasswordRequest>()
+                }) {
+                    val userId = call.requireUserId() ?: return@post
+                    val request = call.receive<ChangePasswordRequest>()
 
-                val response = authService.changePassword(userId, call.getSessionIdOrNull(), request)
-                call.respond(HttpStatusCode.OK, ApiResponse.success(response))
+                    val response = authService.changePassword(userId, call.getSessionIdOrNull(), request)
+                    call.respond(HttpStatusCode.OK, ApiResponse.success(response))
+                }
             }
 
             delete("/me", {
@@ -609,10 +616,7 @@ fun Route.authRoutes() {
 
                 // 현재 세션은 삭제 불가
                 if (sessionIdToDelete == currentSessionId) {
-                    return@delete call.respond(
-                        HttpStatusCode.Forbidden,
-                        ApiResponse.error<Unit>(Errors.User.DEVICE_LOGOUT_CURRENT)
-                    )
+                    throw ForbiddenException(Errors.User.DEVICE_LOGOUT_CURRENT)
                 }
 
                 userSessionService.requireDeviceOwner(userId, sessionIdToDelete)

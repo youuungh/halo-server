@@ -2,23 +2,19 @@ package com.ninezero.features.social.domain
 
 import com.ninezero.core.cache.CacheKeys
 import com.ninezero.core.cache.CacheService
-import com.ninezero.core.common.config.BookmarkTargetType
 import com.ninezero.core.common.config.Constants
 import com.ninezero.core.common.config.FeedType
-import com.ninezero.core.common.config.LikeType
 import com.ninezero.core.common.exception.Errors
 import com.ninezero.core.common.exception.InvalidHashtagException
 import com.ninezero.core.common.exception.UserNotFoundException
 import com.ninezero.core.common.util.*
 import com.ninezero.core.database.entities.social.PostDao
-import com.ninezero.features.social.batchLoadPostMediaItems
 import com.ninezero.features.social.createFeedResponse
 import com.ninezero.features.social.data.*
 import com.ninezero.features.social.isValidHashtag
 import com.ninezero.features.social.presentation.models.request.FeedRequest
 import com.ninezero.features.social.presentation.models.response.FeedResponse
 import com.ninezero.features.social.presentation.models.response.PostResponse
-import com.ninezero.features.social.toPostResponse
 import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
@@ -26,8 +22,6 @@ import kotlin.time.Duration.Companion.minutes
 
 class FeedService(
     private val postRepository: PostRepository,
-    private val likeRepository: LikeRepository,
-    private val bookmarkRepository: BookmarkRepository,
     private val followRepository: FollowRepository,
     private val hiddenPostRepository: HiddenPostRepository,
     private val blockedUserRepository: BlockedUserRepository,
@@ -94,13 +88,13 @@ class FeedService(
 
         val response = query {
             // 후보 부족하면 확장
-            val effectiveHours = Constants.Social.TRENDING_FALLBACK_HOURS
+            val actualHours = Constants.Social.TRENDING_FALLBACK_HOURS
                 .firstOrNull { hours ->
                     postRepository.countTrendingPosts(hours) >= Constants.Social.TRENDING_MIN_COUNT
                 } ?: Constants.Social.TRENDING_FALLBACK_HOURS.last()
 
             val posts = postRepository.findTrendingPosts(
-                hours = effectiveHours,
+                hours = actualHours,
                 page = validPage,
                 limit = validLimit
             )
@@ -172,54 +166,13 @@ class FeedService(
     }
 
     private suspend fun buildPostResponses(posts: List<PostDao>, userId: Int?): List<PostResponse> {
-        // canAccess로 전달
-        val accessMap = if (userId != null) {
-            postService.checkMultiplePostAccess(userId, posts)
-        } else {
-            posts.associate {
-                it.id.value to TierAccessEvaluator.canAccess(
-                    viewerId = null,
-                    ownerId = it.userId,
-                    creatorId = it.creatorId,
-                    requiredTier = it.requiredTier,
-                    isSecret = it.isSecret,
-                    viewerTier = null
-                )
-            }
-        }
+        val userMap = userRepository.findUsersByIds(posts.map { it.userId }.distinct()).associateBy { it.id.value }
+        val statusMaps = postService.buildPostStatusMaps(userId, posts)
 
-        val userIds = posts.map { it.userId }.distinct()
-        val users = userRepository.findUsersByIds(userIds)
-        val userMap = users.associateBy { it.id.value }
-
-        val postIds = posts.map { it.id.value }
-        val likeStatusMap = if (userId != null) {
-            likeRepository.checkMultipleLikes(userId, LikeType.POST, postIds)
-        } else {
-            emptyMap()
-        }
-
-        val bookmarkStatusMap = if (userId != null) {
-            bookmarkRepository.checkMultipleBookmarks(userId, BookmarkTargetType.POST, postIds)
-        } else {
-            emptyMap()
-        }
-
-        val followStatusMap = if (userId != null) {
-            followRepository.checkMultipleFollowStatus(userId, userIds)
-        } else {
-            emptyMap()
-        }
-
-        val postMediaMap = batchLoadPostMediaItems(postIds)
         return posts.map { post ->
-            val author = userMap[post.userId]?.toUserSummaryResponse(isFollowing = followStatusMap[post.userId])
+            val author = userMap[post.userId]?.toUserSummaryResponse(isFollowing = statusMaps.followStatusMap[post.userId])
                 ?: throw UserNotFoundException(Errors.Social.Post.AUTHOR_NOT_FOUND)
-
-            val isLiked = likeStatusMap[post.id.value] ?: false
-            val isBookmarked = bookmarkStatusMap[post.id.value] ?: false
-            val canAccess = accessMap[post.id.value] ?: false
-            post.toPostResponse(author = author, isLiked = isLiked, isBookmarked = isBookmarked, canAccess = canAccess, mediaItems = postMediaMap[post.id.value] ?: emptyList())
+            statusMaps.toResponse(post, author)
         }
     }
 }

@@ -329,7 +329,7 @@ class OrderRepositoryImpl : OrderRepository {
     }
 
     /** 크리에이터 배송그룹에 배송추적 구독 id 기록 */
-    override suspend fun setTrackingSubId(
+    override suspend fun setTrackingSubscriptionId(
         orderId: Int,
         creatorId: Int,
         subscriptionId: String
@@ -340,7 +340,7 @@ class OrderRepositoryImpl : OrderRepository {
     }
 
     /** 크리에이터 배송그룹의 배송추적 구독 id 해제 */
-    override suspend fun clearTrackingSubId(orderId: Int, creatorId: Int): OrderShipmentDao? {
+    override suspend fun clearTrackingSubscriptionId(orderId: Int, creatorId: Int): OrderShipmentDao? {
         val shipment = findCreatorShipment(orderId, creatorId) ?: return null
         shipment.deliverySubscriptionId = null
         return shipment

@@ -17,7 +17,7 @@ data class CouponRequest(
     val maxDiscountAmount: String? = null,
     val totalQuantity: Int,
     val maxUseCount: Int = 1,
-    val targetIds: List<Int>? = null,  // 적용 대상 상품/카테고리 ID
+    val targetIds: List<Int>? = null,  // 적용 대상 상품·카테고리 ID
     val startDate: LocalDateTime,
     val endDate: LocalDateTime
 )

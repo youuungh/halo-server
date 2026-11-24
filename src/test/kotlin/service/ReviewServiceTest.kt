@@ -13,11 +13,10 @@ import com.ninezero.core.storage.ImageProcessingService
 import com.ninezero.features.commerce.data.OrderRepositoryImpl
 import com.ninezero.features.commerce.data.ProductRepositoryImpl
 import com.ninezero.features.commerce.data.ReviewRepositoryImpl
-import com.ninezero.features.commerce.domain.ProductService
 import com.ninezero.features.commerce.domain.ReviewService
 import com.ninezero.features.commerce.presentation.models.request.ReviewRequest
 import com.ninezero.features.commerce.presentation.models.request.UpdateReviewRequest
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.user.data.UserRepositoryImpl
 import com.ninezero.helper.TestDatabase
 import com.ninezero.helper.TestFixtures
@@ -32,6 +31,7 @@ import io.mockk.coVerify
 import org.junit.jupiter.api.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import com.ninezero.features.commerce.domain.ProductAccessService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReviewServiceTest {
@@ -41,11 +41,11 @@ class ReviewServiceTest {
     private lateinit var orderRepository: OrderRepositoryImpl
     private lateinit var productRepository: ProductRepositoryImpl
     private lateinit var userRepository: UserRepositoryImpl
-    private lateinit var notificationService: NotificationService
+    private lateinit var notificationSender: NotificationSender
     private lateinit var fileUploadService: FileUploadService
     private lateinit var imageProcessingService: ImageProcessingService
     private lateinit var cacheService: CacheService
-    private lateinit var productService: ProductService
+    private lateinit var productAccessService: ProductAccessService
 
     @BeforeAll
     fun setup() {
@@ -58,15 +58,15 @@ class ReviewServiceTest {
             userRepository = UserRepositoryImpl()
 
             // Mock 객체 생성
-            notificationService = mockk(relaxed = true)
+            notificationSender = mockk(relaxed = true)
             fileUploadService = mockk(relaxed = true)
             imageProcessingService = mockk(relaxed = true)
             cacheService = mockk(relaxed = true)
-            productService = mockk(relaxed = true)
+            productAccessService = mockk(relaxed = true)
 
             // Mock 동작 정의
             coEvery {
-                notificationService.sendProductReviewedNotification(any(), any(), any(), any())
+                notificationSender.sendProductReviewedNotification(any(), any(), any(), any())
             } returns mockk()
 
             coEvery {
@@ -89,11 +89,11 @@ class ReviewServiceTest {
                 orderRepository = orderRepository,
                 productRepository = productRepository,
                 userRepository = userRepository,
-                notificationService = notificationService,
+                notificationSender = notificationSender,
                 fileUploadService = fileUploadService,
                 imageProcessingService = imageProcessingService,
                 cacheService = cacheService,
-                productService = productService,
+                productAccessService = productAccessService,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
             )
         }
@@ -577,7 +577,7 @@ class ReviewServiceTest {
     @Test
     fun `사진 리뷰 업로드가 실패하면 판매자에게 알리지 않고 리뷰도 남기지 않는다`() {
         runBlocking {
-            clearMocks(notificationService, answers = false)
+            clearMocks(notificationSender, answers = false)
             val user = TestFixtures.createTestUser()
             val creator = TestFixtures.createTestCreator()
             val product = TestFixtures.createTestProduct(creator.id.value)
@@ -601,7 +601,7 @@ class ReviewServiceTest {
                 coEvery { fileUploadService.uploadReviewImages(any(), any()) } returns listOf("https://example.com/review-image.jpg")
             }
 
-            coVerify(exactly = 0) { notificationService.sendProductReviewedNotification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { notificationSender.sendProductReviewedNotification(any(), any(), any(), any()) }
             assertEquals(null, query { reviewRepository.findReviewByOrderProduct(order.id.value, product.id.value) })
         }
     }

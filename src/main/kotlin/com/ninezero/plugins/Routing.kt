@@ -1,33 +1,25 @@
 package com.ninezero.plugins
 
-import com.ninezero.core.common.config.Constants
-import com.ninezero.core.common.config.CouponType
 import com.ninezero.core.common.config.DotenvConfig
 import com.ninezero.core.common.exception.AppException
 import com.ninezero.core.common.exception.Errors
-import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.util.ApiResponse
-import com.ninezero.core.common.util.ValidationUtils
 import com.ninezero.core.websocket.realtimeWebSocket
-import com.ninezero.features.admin.presentation.monitoringRoutes
 import com.ninezero.features.banner.presentation.bannerRoutes
 import com.ninezero.features.chat.presentation.chatRoutes
 import com.ninezero.features.chat.presentation.messageRoutes
 import com.ninezero.features.commerce.presentation.*
 import com.ninezero.features.coupon.presentation.couponRoutes
-import com.ninezero.features.coupon.presentation.models.request.ClaimCouponRequest
-import com.ninezero.features.coupon.presentation.models.request.CouponRequest
-import com.ninezero.features.coupon.presentation.models.request.UpdateCouponRequest
+import com.ninezero.features.coupon.presentation.validateCouponRequests
+import com.ninezero.features.monitoring.presentation.monitoringRoutes
 import com.ninezero.features.notification.presentation.notificationRoutes
 import com.ninezero.features.point.presentation.pointRoutes
 import com.ninezero.features.search.presentation.searchRoutes
 import com.ninezero.features.share.presentation.shareRoutes
 import com.ninezero.features.social.presentation.*
-import com.ninezero.features.subscription.presentation.models.request.SubscribeRequest
-import com.ninezero.features.subscription.presentation.models.request.SubscriptionPlanRequest
-import com.ninezero.features.subscription.presentation.models.request.UpdatePlanRequest
 import com.ninezero.features.subscription.presentation.subscriptionPlanRoutes
 import com.ninezero.features.subscription.presentation.subscriptionRoutes
+import com.ninezero.features.subscription.presentation.validateSubscriptionRequests
 import com.ninezero.features.tag.presentation.tagRoutes
 import com.ninezero.features.upload.presentation.mediaDraftRoutes
 import com.ninezero.features.user.presentation.*
@@ -54,155 +46,9 @@ fun Application.configureRouting() {
 
 private fun Application.configureRequestValidation() {
     install(RequestValidation) {
-        // User 검증
-
-        validate<RegisterRequest> {
-            validateRequest {
-                ValidationUtils.validateEmail(it.email)
-                ValidationUtils.validateUsername(ValidationUtils.normalizeUsername(it.username))
-            }
-        }
-
-        validate<ResendVerificationRequest> {
-            validateRequest {
-                ValidationUtils.validateEmail(it.email)
-            }
-        }
-
-        validate<ForgotPasswordRequest> {
-            validateRequest {
-                ValidationUtils.validateEmail(it.email)
-            }
-        }
-
-        validate<VerifyResetCodeRequest> {
-            validateRequest {
-                ValidationUtils.validateEmail(it.email)
-                if (it.code.length != Constants.User.VERIFICATION_CODE_LENGTH) {
-                    throw InvalidInputException(Errors.User.RESET_CODE_INVALID)
-                }
-            }
-        }
-
-        validate<ResetPasswordRequest> {
-            validateRequest {
-                if (it.token.isBlank()) throw InvalidInputException("토큰은 필수입니다.")
-            }
-        }
-
-        validate<LoginRequest> {
-            validateRequest {
-                if (it.email.isBlank()) throw InvalidInputException("이메일은 필수입니다.")
-                if (it.password.isBlank()) throw InvalidInputException("비밀번호는 필수입니다.")
-            }
-        }
-
-        validate<CreatorApplicationRequest> {
-            validateRequest {
-                ValidationUtils.validateCreatorApplicationReason(it.reason)
-            }
-        }
-
-        validate<RejectApplicationRequest> {
-            validateRequest {
-                ValidationUtils.validateRejectionReason(it.rejectionReason)
-            }
-        }
-
-        // Address 검증
-
-        validate<CreateAddressRequest> {
-            validateRequest {
-                ValidationUtils.validateRecipientName(it.recipientName)
-                ValidationUtils.validateRecipientPhone(it.recipientPhone)
-                ValidationUtils.validateZipCode(it.zipCode)
-                ValidationUtils.validateAddress(it.address)
-                ValidationUtils.validateAddressDetail(it.addressDetail)
-                ValidationUtils.validateAddressMemo(it.memo)
-            }
-        }
-
-        validate<UpdateAddressRequest> {
-            validateRequest {
-                ValidationUtils.validateRecipientName(it.recipientName)
-                ValidationUtils.validateRecipientPhone(it.recipientPhone)
-                ValidationUtils.validateZipCode(it.zipCode)
-                ValidationUtils.validateAddress(it.address)
-                ValidationUtils.validateAddressDetail(it.addressDetail)
-                ValidationUtils.validateAddressMemo(it.memo)
-            }
-        }
-
-        // Subscription 검증
-
-        validate<SubscriptionPlanRequest> {
-            validateRequest {
-                ValidationUtils.validatePlanName(it.name)
-                ValidationUtils.validatePlanDescription(it.description)
-                ValidationUtils.validatePrice(it.price, "플랜 가격")
-                ValidationUtils.validatePlanBenefits(it.benefits)
-            }
-        }
-
-        validate<UpdatePlanRequest> {
-            validateRequest {
-                it.name?.let { name -> ValidationUtils.validatePlanName(name) }
-                it.description?.let { desc -> ValidationUtils.validatePlanDescription(desc) }
-                it.benefits?.let { benefits -> ValidationUtils.validatePlanBenefits(benefits) }
-            }
-        }
-
-        validate<SubscribeRequest> {
-            validateRequest {
-                ValidationUtils.validatePlanId(it.planId)
-            }
-        }
-
-        // Coupon 검증
-
-        validate<CouponRequest> {
-            validateRequest {
-                ValidationUtils.validateManualCouponCode(it.code)
-                ValidationUtils.validateCouponName(it.name)
-                ValidationUtils.validateCouponDescription(it.description)
-
-                when (it.type) {
-                    CouponType.PERCENTAGE -> {
-                        val rate = it.discountValue.toIntOrNull()
-                            ?: throw InvalidInputException("할인율은 숫자여야 합니다.")
-                        ValidationUtils.validateCouponDiscountRate(rate)
-                    }
-
-                    CouponType.FIXED_AMOUNT -> {
-                        ValidationUtils.validateCouponDiscountAmount(it.discountValue)
-                    }
-
-                    CouponType.FREE_SHIPPING -> {
-                        // 검증 불필요
-                    }
-                }
-
-                ValidationUtils.validateCouponMinOrderAmount(it.minOrderAmount)
-                ValidationUtils.validateCouponQuantity(it.totalQuantity)
-                ValidationUtils.validateCouponUseCount(it.maxUseCount)
-            }
-        }
-
-        validate<UpdateCouponRequest> {
-            validateRequest {
-                it.name?.let { name -> ValidationUtils.validateCouponName(name) }
-                it.description?.let { desc -> ValidationUtils.validateCouponDescription(desc) }
-                it.minOrderAmount?.let { amount -> ValidationUtils.validateCouponMinOrderAmount(amount) }
-                it.totalQuantity?.let { qty -> ValidationUtils.validateCouponQuantity(qty) }
-                it.maxUseCount?.let { count -> ValidationUtils.validateCouponUseCount(count) }
-            }
-        }
-
-        validate<ClaimCouponRequest> {
-            validateRequest {
-                ValidationUtils.validateCouponCode(it.code)
-            }
-        }
+        validateUserRequests()
+        validateSubscriptionRequests()
+        validateCouponRequests()
     }
 }
 
@@ -393,14 +239,5 @@ private fun Application.registerApiRoutes() {
 
         // Monitoring 라우트
         monitoringRoutes()
-    }
-}
-
-private inline fun validateRequest(block: () -> Unit): ValidationResult {
-    return try {
-        block()
-        ValidationResult.Valid
-    } catch (e: Exception) {
-        ValidationResult.Invalid(e.message ?: "검증 실패")
     }
 }

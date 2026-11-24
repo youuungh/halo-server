@@ -67,14 +67,7 @@ fun Route.likeRoutes() {
                         description = "포스트 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {
@@ -104,14 +97,7 @@ fun Route.likeRoutes() {
                         description = "댓글 ID"
                         required = true
                     }
-                    queryParameter<Int>("page") {
-                        description = "페이지 번호 (기본값: 1)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    pageParams()
                 }
                 authResponse()
                 response {
@@ -137,14 +123,7 @@ fun Route.likeRoutes() {
                 tags("Likes")
                 description = "포스트·댓글 데이터 포함"
                 request {
-                    queryParameter<String>("cursor") {
-                        description = "다음 페이지 커서 (응답의 nextCursor, 생략 시 처음부터)"
-                        required = false
-                    }
-                    queryParameter<Int>("limit") {
-                        description = "페이지 크기 (기본값: 20)"
-                        required = false
-                    }
+                    cursorParams()
                     queryParameter<String>("targetType") {
                         description = "필터 타입 (POST, COMMENT, 생략 시 전체)"
                         required = false

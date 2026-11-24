@@ -2,7 +2,7 @@ package com.ninezero.features.social.domain
 
 import com.ninezero.core.common.util.logger
 import com.ninezero.core.common.util.query
-import com.ninezero.features.notification.domain.NotificationService
+import com.ninezero.features.notification.domain.NotificationSender
 import com.ninezero.features.social.data.FollowRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -13,7 +13,7 @@ private val newPostLogger = logger("NewPostNotifier")
 internal fun launchNewPostNotifications(
     coroutineScope: CoroutineScope,
     followRepository: FollowRepository,
-    notificationService: NotificationService,
+    notificationSender: NotificationSender,
     creatorId: Int,
     creatorUsername: String,
     postId: Int
@@ -25,7 +25,7 @@ internal fun launchNewPostNotifications(
             }
 
             if (followerIds.isNotEmpty()) {
-                notificationService.sendNewPostNotifications(
+                notificationSender.sendNewPostNotifications(
                     creatorId = creatorId,
                     creatorUsername = creatorUsername,
                     postId = postId,

@@ -8,14 +8,14 @@ import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.v1.jdbc.Database
 
 fun Application.configureDatabases() {
-    val dataSource = initDB()
+    val dataSource = initDatabase()
     runFlyway(dataSource)
     // 요청·백그라운드 작업이 끝난 뒤 커넥션 반납
     monitor.subscribe(ApplicationStopped) { dataSource.close() }
     log.info("데이터베이스 초기화 완료")
 }
 
-private fun Application.initDB(): HikariDataSource {
+private fun Application.initDatabase(): HikariDataSource {
     val url = DotenvConfig.getOrDefault("DATABASE_URL", "jdbc:h2:file:./data/hub")
     val user = DotenvConfig.getOrDefault("DATABASE_USER", "sa")
     val driver = DotenvConfig.getOrDefault("DATABASE_DRIVER", "org.h2.Driver")

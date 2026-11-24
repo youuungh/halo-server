@@ -6,7 +6,7 @@ import com.ninezero.core.database.entities.social.BookmarkDao
 
 interface BookmarkRepository {
 
-    // 북마크 생성/삭제
+    // 북마크 생성·삭제
     suspend fun createBookmark(userId: Int, targetType: BookmarkTargetType, targetId: Int): BookmarkDao?
     suspend fun deleteBookmark(userId: Int, targetType: BookmarkTargetType, targetId: Int): Boolean
 
