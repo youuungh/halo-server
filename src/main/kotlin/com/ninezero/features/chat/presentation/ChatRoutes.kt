@@ -169,7 +169,7 @@ fun Route.chatRoutes() {
 
                 val archived = call.getOptionalBooleanParam("archived") ?: true
 
-                chatService.setArchived(roomId, userId, archived)
+                chatService.setArchived(roomId, userId, archived, call.getSessionIdOrNull())
                 val response = if (archived) Messages.Chat.CHAT_ARCHIVED else Messages.Chat.CHAT_UNARCHIVED
                 call.respond(HttpStatusCode.OK, ApiResponse.success(message = response))
             }
@@ -199,7 +199,7 @@ fun Route.chatRoutes() {
                 val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
                     ?: return@put
 
-                chatService.clearChatRoom(roomId, userId)
+                chatService.clearChatRoom(roomId, userId, call.getSessionIdOrNull())
                 call.respond(HttpStatusCode.OK, ApiResponse.success(message = Messages.Chat.CHAT_CLEARED))
             }
         }

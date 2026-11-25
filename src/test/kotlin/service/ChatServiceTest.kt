@@ -3,6 +3,7 @@ package com.ninezero.service
 import com.ninezero.core.common.exception.ForbiddenException
 import com.ninezero.core.common.exception.InvalidInputException
 import com.ninezero.core.common.exception.NotFoundException
+import com.ninezero.core.websocket.WebSocketManager
 import com.ninezero.features.chat.data.ChatRepositoryImpl
 import com.ninezero.features.chat.domain.ChatService
 import com.ninezero.features.user.data.BlockedUserRepositoryImpl
@@ -10,6 +11,9 @@ import com.ninezero.features.user.data.UserRepositoryImpl
 import com.ninezero.core.common.util.query
 import com.ninezero.helper.TestDatabase
 import com.ninezero.helper.TestFixtures
+import io.mockk.clearMocks
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import kotlin.test.assertEquals
@@ -22,6 +26,7 @@ class ChatServiceTest {
     private lateinit var chatRepository: ChatRepositoryImpl
     private lateinit var userRepository: UserRepositoryImpl
     private lateinit var blockedUserRepository: BlockedUserRepositoryImpl
+    private lateinit var webSocketManager: WebSocketManager
 
     @BeforeAll
     fun setup() {
@@ -31,11 +36,13 @@ class ChatServiceTest {
             chatRepository = ChatRepositoryImpl()
             userRepository = UserRepositoryImpl()
             blockedUserRepository = BlockedUserRepositoryImpl()
+            webSocketManager = mockk(relaxed = true)
 
             chatService = ChatService(
                 chatRepository = chatRepository,
                 userRepository = userRepository,
-                blockedUserRepository = blockedUserRepository
+                blockedUserRepository = blockedUserRepository,
+                webSocketManager = webSocketManager
             )
         }
     }
@@ -148,6 +155,26 @@ class ChatServiceTest {
         }
     }
 
+    @Test
+    fun `채팅방 보관은 요청한 기기를 뺀 내 다른 기기에도 알린다`() {
+        runBlocking {
+            clearMocks(webSocketManager, answers = false)
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = chatService.getOrCreateChatRoom(user1.id.value, user2.id.value)
+
+            chatService.setArchived(chatRoom.id, user1.id.value, true, senderSessionId = "session-a")
+
+            coVerify(exactly = 1) {
+                webSocketManager.sendToUserExcept(
+                    user1.id.value,
+                    "session-a",
+                    match { it.contains("\"ROOM_ARCHIVED\"") && it.contains("\"archived\":true") }
+                )
+            }
+        }
+    }
+
     // ===== 채팅방 사용자별 삭제 테스트 =====
 
     @Test
@@ -220,6 +247,22 @@ class ChatServiceTest {
 
             // unread count 0으로 초기화
             assertEquals(0, chatService.getChatRoomById(chatRoom.id, user1.id.value).unreadCount)
+        }
+    }
+
+    @Test
+    fun `채팅방 삭제는 내 다른 기기에도 알린다`() {
+        runBlocking {
+            clearMocks(webSocketManager, answers = false)
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = chatService.getOrCreateChatRoom(user1.id.value, user2.id.value)
+
+            chatService.clearChatRoom(chatRoom.id, user1.id.value, senderSessionId = "session-a")
+
+            coVerify(exactly = 1) {
+                webSocketManager.sendToUserExcept(user1.id.value, "session-a", match { it.contains("\"ROOM_CLEARED\"") })
+            }
         }
     }
 

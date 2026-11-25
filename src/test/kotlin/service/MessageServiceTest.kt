@@ -239,6 +239,66 @@ class MessageServiceTest {
         }
     }
 
+    // ===== 내 다른 기기 동기화 테스트 =====
+
+    @Test
+    fun `보낸 메시지는 보낸 기기를 뺀 내 다른 기기에도 전달한다`() {
+        runBlocking {
+            clearMocks(webSocketManager, answers = false)
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = query { chatRepository.getOrCreateChatRoom(user1.id.value, user2.id.value) }
+            val request = SendMessageRequest(content = "안녕하세요", chatMessageType = ChatMessageType.TEXT, clientTempId = "temp-1")
+
+            messageService.sendMessage(chatRoom.id.value, user1.id.value, request, senderSessionId = "session-a")
+            messageService.sendMessage(chatRoom.id.value, user1.id.value, request, senderSessionId = "session-a")  // 재전송
+
+            // 내 관점(clientTempId 포함), 재전송은 다시 보내지 않음
+            coVerify(exactly = 1) {
+                webSocketManager.sendToUserExcept(
+                    user1.id.value,
+                    "session-a",
+                    match { it.contains("\"MESSAGE\"") && it.contains("\"clientTempId\":\"temp-1\"") }
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `방을 읽으면 내 다른 기기에 읽음을 알리고 읽을 게 없으면 보내지 않는다`() {
+        runBlocking {
+            clearMocks(webSocketManager, answers = false)
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = query { chatRepository.getOrCreateChatRoom(user1.id.value, user2.id.value) }
+            messageService.sendMessage(chatRoom.id.value, user1.id.value, SendMessageRequest("안녕하세요", ChatMessageType.TEXT, null, null))
+
+            messageService.markMessagesAsRead(chatRoom.id.value, user2.id.value, senderSessionId = "session-b")
+            messageService.markMessagesAsRead(chatRoom.id.value, user2.id.value, senderSessionId = "session-b")  // 이미 다 읽음
+
+            coVerify(exactly = 1) {
+                webSocketManager.sendToUserExcept(user2.id.value, "session-b", match { it.contains("\"ROOM_READ\"") })
+            }
+        }
+    }
+
+    @Test
+    fun `메시지를 지우면 내 다른 기기에도 삭제를 알린다`() {
+        runBlocking {
+            clearMocks(webSocketManager, answers = false)
+            val user1 = TestFixtures.createTestUser(email = "user1@example.com", username = "user1")
+            val user2 = TestFixtures.createTestUser(email = "user2@example.com", username = "user2")
+            val chatRoom = query { chatRepository.getOrCreateChatRoom(user1.id.value, user2.id.value) }
+            val message = messageService.sendMessage(chatRoom.id.value, user1.id.value, SendMessageRequest("지울 메시지", ChatMessageType.TEXT, null, null))
+
+            messageService.deleteMessage(message.id, user1.id.value, senderSessionId = "session-a")
+
+            coVerify(exactly = 1) {
+                webSocketManager.sendToUserExcept(user1.id.value, "session-a", match { it.contains("\"MESSAGE_DELETED\"") })
+            }
+        }
+    }
+
     // ===== 메시지 전송 테스트 =====
 
     @Test

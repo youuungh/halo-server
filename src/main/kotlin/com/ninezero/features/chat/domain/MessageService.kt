@@ -30,6 +30,7 @@ import com.ninezero.features.chat.presentation.models.response.MessageDeletedEve
 import com.ninezero.features.chat.presentation.models.response.MessageListResponse
 import com.ninezero.features.chat.presentation.models.response.MessageReadEvent
 import com.ninezero.features.chat.presentation.models.response.MessageResponse
+import com.ninezero.features.chat.presentation.models.response.RoomReadEvent
 import com.ninezero.features.chat.presentation.models.response.SearchMessageListResponse
 import com.ninezero.features.chat.toMessageResponse
 import com.ninezero.features.commerce.data.ProductRepository
@@ -71,7 +72,8 @@ class MessageService(
     suspend fun sendMessage(
         roomId: Int,
         currentUserId: Int,
-        request: SendMessageRequest
+        request: SendMessageRequest,
+        senderSessionId: String? = null
     ): MessageResponse {
         ChatValidation.validateClientTempId(request.clientTempId)
 
@@ -191,6 +193,12 @@ class MessageService(
                 )
             )
         )
+        // 다른 기기에도 같은 메시지
+        webSocketManager.sendToUserExcept(
+            currentUserId,
+            senderSessionId,
+            DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE, response))
+        )
 
         coroutineScope.launch {  // 커밋 후 알림 발송
             try {
@@ -203,16 +211,16 @@ class MessageService(
         return response
     }
 
-    /** 공유 등 다른 경로로 만든 메시지를 수신자 실시간 연결로 전달 */
-    suspend fun pushToReceiver(receiverId: Int, messageIds: List<Int>) {
-        if (messageIds.isEmpty() || !webSocketManager.isUserConnected(receiverId)) return
+    /** 공유 등 다른 경로로 만든 메시지를 그 사용자 관점으로 실시간 연결에 전달 */
+    suspend fun pushToUser(userId: Int, messageIds: List<Int>) {
+        if (messageIds.isEmpty() || !webSocketManager.isUserConnected(userId)) return
 
         val responses = query {
-            buildMessageResponses(messageIds.mapNotNull { messageRepository.findMessageById(it) }, receiverId)
+            buildMessageResponses(messageIds.mapNotNull { messageRepository.findMessageById(it) }, userId)
         }
         responses.forEach { response ->
             webSocketManager.sendToUser(
-                receiverId,
+                userId,
                 DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE, response))
             )
         }
@@ -314,7 +322,11 @@ class MessageService(
         )
     }
 
-    suspend fun markMessagesAsRead(roomId: Int, currentUserId: Int): MarkMessagesReadResponse {
+    suspend fun markMessagesAsRead(
+        roomId: Int,
+        currentUserId: Int,
+        senderSessionId: String? = null
+    ): MarkMessagesReadResponse {
         val readInfo = query {
             requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
 
@@ -345,11 +357,20 @@ class MessageService(
             }
         }
 
+        // 내 다른 기기의 안 읽음도 정리
+        if (readInfo.messageIds.isNotEmpty()) {
+            webSocketManager.sendToUserExcept(
+                currentUserId,
+                senderSessionId,
+                DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.ROOM_READ, RoomReadEvent(roomId)))
+            )
+        }
+
         return MarkMessagesReadResponse(lastReadMessageId = readInfo.lastReadMessageId)
     }
 
     // 메시지 삭제
-    suspend fun deleteMessage(messageId: Int, currentUserId: Int) {
+    suspend fun deleteMessage(messageId: Int, currentUserId: Int, senderSessionId: String? = null) {
         val (fileUrls, roomId, receiverId) = query {
             val message = messageRepository.findMessageById(messageId)
                 ?: throw NotFoundException(Errors.Chat.MESSAGE_NOT_FOUND)
@@ -401,6 +422,11 @@ class MessageService(
         ) {
             logger.debug("삭제 이벤트 전송: receiverId={}, messageId={}, roomId={}", receiverId, messageId, roomId)
         }
+        webSocketManager.sendToUserExcept(  // 내 다른 기기에도 삭제 반영
+            currentUserId,
+            senderSessionId,
+            DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.MESSAGE_DELETED, deletedEvent))
+        )
 
         fileUploadService.deleteByUrls(fileUrls)
     }

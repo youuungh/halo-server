@@ -9,18 +9,25 @@ import com.ninezero.core.common.util.PaginationInfo
 import com.ninezero.core.common.util.createPagedResponse
 import com.ninezero.core.common.util.query
 import com.ninezero.core.common.util.validatePaginationParams
+import com.ninezero.core.websocket.RealtimeFrame
+import com.ninezero.core.websocket.RealtimeFrameType
+import com.ninezero.core.websocket.WebSocketManager
 import com.ninezero.features.chat.data.ChatRepository
 import com.ninezero.features.chat.presentation.models.response.ChatRoomListResponse
 import com.ninezero.features.chat.presentation.models.response.ChatRoomResponse
+import com.ninezero.features.chat.presentation.models.response.RoomArchivedEvent
+import com.ninezero.features.chat.presentation.models.response.RoomClearedEvent
 import com.ninezero.features.chat.toChatRoomResponse
 import com.ninezero.features.user.data.BlockedUserRepository
 import com.ninezero.features.user.data.UserRepository
 import com.ninezero.features.user.toUserSummaryResponse
+import io.ktor.serialization.kotlinx.json.DefaultJson
 
 class ChatService(
     private val chatRepository: ChatRepository,
     private val userRepository: UserRepository,
-    private val blockedUserRepository: BlockedUserRepository
+    private val blockedUserRepository: BlockedUserRepository,
+    private val webSocketManager: WebSocketManager
 ) {
 
     suspend fun findChatRoomWithUser(currentUserId: Int, otherUserId: Int): ChatRoomResponse? {
@@ -125,17 +132,27 @@ class ChatService(
         }
     }
 
-    suspend fun setArchived(roomId: Int, currentUserId: Int, archived: Boolean) {
+    suspend fun setArchived(roomId: Int, currentUserId: Int, archived: Boolean, senderSessionId: String? = null) {
         query {
             requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
             chatRepository.setArchived(roomId, currentUserId, archived)
         }
+        webSocketManager.sendToUserExcept(  // 내 다른 기기 목록에도 반영
+            currentUserId,
+            senderSessionId,
+            DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.ROOM_ARCHIVED, RoomArchivedEvent(roomId, archived)))
+        )
     }
 
-    suspend fun clearChatRoom(roomId: Int, currentUserId: Int) {
+    suspend fun clearChatRoom(roomId: Int, currentUserId: Int, senderSessionId: String? = null) {
         query {
             requireChatRoomParticipant(chatRepository, roomId, currentUserId, Errors.Chat.CHAT_PERMISSION_DENIED)
             chatRepository.clearChatRoom(roomId, currentUserId)  // 본인 기록만 가림, 새 메시지로 복구
         }
+        webSocketManager.sendToUserExcept(  // 내 다른 기기에 남은 기록도 비움
+            currentUserId,
+            senderSessionId,
+            DefaultJson.encodeToString(RealtimeFrame(RealtimeFrameType.ROOM_CLEARED, RoomClearedEvent(roomId)))
+        )
     }
 }

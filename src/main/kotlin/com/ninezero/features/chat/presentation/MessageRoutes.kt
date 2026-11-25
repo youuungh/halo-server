@@ -88,7 +88,7 @@ fun Route.messageRoutes() {
                     ?: return@post
 
                 val request = call.receive<SendMessageRequest>()
-                val response = messageService.sendMessage(roomId, userId, request)
+                val response = messageService.sendMessage(roomId, userId, request, call.getSessionIdOrNull())
                 call.respond(HttpStatusCode.Created, ApiResponse.success(response, Messages.Chat.MESSAGE_SENT))
             }
 
@@ -244,7 +244,7 @@ fun Route.messageRoutes() {
                 val roomId = call.getRequiredIntParam("roomId", Errors.Chat.INVALID_ROOM_ID)
                     ?: return@put
 
-                val response = messageService.markMessagesAsRead(roomId, userId)
+                val response = messageService.markMessagesAsRead(roomId, userId, call.getSessionIdOrNull())
                 call.respond(
                     HttpStatusCode.OK,
                     ApiResponse.success(response, Messages.Chat.ALL_MESSAGES_READ)
@@ -278,7 +278,7 @@ fun Route.messageRoutes() {
                 val messageId = call.getRequiredIntParam("messageId", Errors.Chat.INVALID_MESSAGE_ID)
                     ?: return@delete
 
-                messageService.deleteMessage(messageId, userId)
+                messageService.deleteMessage(messageId, userId, call.getSessionIdOrNull())
                 call.respond(HttpStatusCode.NoContent)
             }
 

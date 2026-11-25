@@ -220,10 +220,15 @@ class ShareService(
         }
         // 커밋 후 실시간 전달·알림 발송
         coroutineScope.launch {
+            try {
+                messageService.pushToUser(currentUserId, newMessages.values.flatMap { it.messageIds })  // 내 기기들에도 반영
+            } catch (e: Exception) {
+                logger.error("공유 실시간 반영 실패: $logContext, error=${e.message}", e)
+            }
             newMessages.forEach { (recipientId, room) ->
                 try {
                     // 열린 채팅 화면에 실시간 반영
-                    messageService.pushToReceiver(recipientId, room.messageIds)
+                    messageService.pushToUser(recipientId, room.messageIds)
                     notificationSender.sendChatMessageNotification(recipientId, currentUserId, room.roomId, preview)
                 } catch (e: Exception) {
                     logger.error("공유 알림 전송 실패: $logContext, recipientId=$recipientId, error=${e.message}", e)

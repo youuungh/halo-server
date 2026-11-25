@@ -34,8 +34,14 @@ class WebSocketManager {
     }
 
     /** 사용자의 전 기기로 전송 */
-    suspend fun sendToUser(userId: Int, message: String): Boolean {
-        val targets = connections[userId]?.toList() ?: return false
+    suspend fun sendToUser(userId: Int, message: String): Boolean = send(userId, message) { true }
+
+    /** 요청한 기기를 뺀 사용자의 다른 기기로 전송, 세션을 모르는 연결은 포함 */
+    suspend fun sendToUserExcept(userId: Int, exceptSessionId: String?, message: String): Boolean =
+        send(userId, message) { exceptSessionId == null || it.sessionId != exceptSessionId }
+
+    private suspend fun send(userId: Int, message: String, filter: (Connection) -> Boolean): Boolean {
+        val targets = connections[userId]?.filter(filter) ?: return false
 
         val failed = mutableListOf<Connection>()
         var success = false

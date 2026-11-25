@@ -107,7 +107,10 @@ class ShareServiceTest {
 
             // 링크·텍스트 2개를 한 번에, 재전송은 다시 보내지 않음
             coVerify(exactly = 1, timeout = 2000) {
-                messageService.pushToReceiver(recipient.id.value, match { it.size == 2 })
+                messageService.pushToUser(recipient.id.value, match { it.size == 2 })
+            }
+            coVerify(exactly = 1, timeout = 2000) {  // 보낸 사람의 내 다른 기기에도
+                messageService.pushToUser(sharer.id.value, match { it.size == 2 })
             }
             coVerify(exactly = 1) {
                 notificationSender.sendChatMessageNotification(recipient.id.value, sharer.id.value, any(), any())
