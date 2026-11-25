@@ -60,7 +60,7 @@ class PostService(
     suspend fun createPost(userId: Int, request: PostRequest): PostResponse {
         val content = request.content.trim()
 
-        SocialValidation.validatePostContent(content)
+        SocialValidation.validatePostContent(content, request.mediaDraftIds.size)
         SocialValidation.validateClientRequestId(request.clientRequestId)
         if (request.postType == PostType.TEXT && request.mediaDraftIds.isNotEmpty()) {
             throw InvalidInputException(Errors.Social.Media.TEXT_POST_WITH_MEDIA)
@@ -201,9 +201,6 @@ class PostService(
 
     suspend fun updatePost(postId: Int, userId: Int, request: UpdatePostRequest): PostResponse {
         val content = request.content.trim()
-
-        SocialValidation.validatePostContent(content)
-
         val extractedTags = extractHashtags(content)
 
         request.tagIds?.let { tagIds ->
@@ -218,6 +215,7 @@ class PostService(
                 userId = userId,
                 errorMessage = Errors.Social.Post.POST_UPDATE_PERMISSION_DENIED
             )
+            SocialValidation.validatePostContent(content, PostMediaDao.count(PostMediaTable.postId eq postId).toInt())
 
             existingPost.content = content
             existingPost.tags = if (extractedTags.isNotEmpty()) {

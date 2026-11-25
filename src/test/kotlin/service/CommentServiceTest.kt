@@ -584,6 +584,23 @@ class CommentServiceTest {
     }
 
     @Test
+    fun `댓글 작성 - 내용 없이 미디어만 있어도 되고 둘 다 없으면 실패`() {
+        runBlocking {
+            val user = TestFixtures.createTestUser()
+            val post = TestFixtures.createTestPost(userId = user.id.value)
+            val draft = TestFixtures.createTestMediaDraft(user.id.value, targetType = MediaDraftTargetType.COMMENT)
+
+            val response = commentService.createComment(user.id.value, post.id.value, " ", mediaDraftIds = listOf(draft.id.value))
+            assertEquals("", response.content)
+            assertEquals(listOf(draft.url), response.mediaItems.map { it.url })
+
+            assertFailsWith<InvalidCommentContentException> {
+                commentService.createComment(user.id.value, post.id.value, " ")
+            }
+        }
+    }
+
+    @Test
     fun `댓글 작성 - 같은 요청 식별자는 새 댓글 없이 만든 댓글을 돌려준다`() {
         runBlocking {
             val user = TestFixtures.createTestUser()

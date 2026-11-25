@@ -84,10 +84,6 @@ class PostMediaService(
         try {
             val finalContent = content?.trim()
 
-            finalContent?.let {
-                SocialValidation.validatePostContent(it)
-            }
-
             val files = newFiles.orEmpty()
             val contentTypes = newContentTypes.orEmpty()
             validateImageParts(imageProcessingService, files, contentTypes, StorageConfig.FileSizeLimit.POST)
@@ -105,6 +101,7 @@ class PostMediaService(
                     .toList()
 
                 val plan = resolveMediaEditPlan(currentItems, keepMediaIds, reorder, sources.size) { it.sortOrder }
+                SocialValidation.validatePostContent(finalContent ?: post.content, plan.orderedKeepIds.size + sources.size)
 
                 // 원본 + 썸네일 + 프리뷰 수거
                 mediaAttachmentsToDelete.addAll(

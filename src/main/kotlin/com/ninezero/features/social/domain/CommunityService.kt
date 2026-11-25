@@ -70,7 +70,7 @@ class CommunityService(
         request: CommunityPostRequest
     ): PostResponse {
         val content = request.content.trim()
-        SocialValidation.validatePostContent(content)
+        SocialValidation.validatePostContent(content, request.mediaDraftIds.size)
         SocialValidation.validateClientRequestId(request.clientRequestId)
         val extractedTags = extractHashtags(content)
 
@@ -131,7 +131,6 @@ class CommunityService(
         request: CommunityPostRequest
     ): PostResponse {
         val content = request.content.trim()
-        SocialValidation.validatePostContent(content)
         val extractedTags = extractHashtags(content)
 
         val (response, targetCreatorId) = query {
@@ -141,6 +140,7 @@ class CommunityService(
             if (post.userId != userId) {  // 작성자 본인만
                 throw ForbiddenException(Errors.Social.Post.POST_UPDATE_PERMISSION_DENIED)
             }
+            SocialValidation.validatePostContent(content, PostMediaDao.count(PostMediaTable.postId eq postId).toInt())
 
             val updatedPost = postRepository.updatePost(
                 postId = postId,

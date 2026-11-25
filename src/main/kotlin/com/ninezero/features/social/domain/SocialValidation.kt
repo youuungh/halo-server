@@ -8,19 +8,19 @@ import com.ninezero.core.common.exception.InvalidPostContentException
 
 /** 포스트·댓글 입력 검증 */
 object SocialValidation {
-    fun validatePostContent(content: String) {
+    fun validatePostContent(content: String, mediaCount: Int) {
         when {
-            content.isBlank() ->
-                throw InvalidPostContentException("포스트 내용은 필수입니다.")
+            content.isBlank() && mediaCount == 0 ->
+                throw InvalidPostContentException("포스트 내용이나 미디어 중 하나는 필수입니다.")
             content.length > Constants.Social.MAX_POST_CONTENT_LENGTH ->
                 throw InvalidPostContentException("포스트 내용은 ${Constants.Social.MAX_POST_CONTENT_LENGTH}자를 초과할 수 없습니다.")
         }
     }
 
-    fun validateCommentContent(content: String) {
+    fun validateCommentContent(content: String, mediaCount: Int) {
         when {
-            content.isBlank() ->
-                throw InvalidCommentContentException("댓글 내용은 필수입니다.")
+            content.isBlank() && mediaCount == 0 ->
+                throw InvalidCommentContentException("댓글 내용이나 미디어 중 하나는 필수입니다.")
             content.length > Constants.Social.MAX_COMMENT_CONTENT_LENGTH ->
                 throw InvalidCommentContentException("댓글 내용은 ${Constants.Social.MAX_COMMENT_CONTENT_LENGTH}자를 초과할 수 없습니다.")
         }

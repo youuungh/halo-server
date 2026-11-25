@@ -461,6 +461,43 @@ class PostServiceTest {
     }
 
     @Test
+    fun `포스트 생성 - 내용 없이 미디어만 있어도 된다`() {
+        runBlocking {
+            val user = TestFixtures.createTestUser()
+            val draft = TestFixtures.createTestMediaDraft(user.id.value)
+
+            val response = postService.createPost(
+                user.id.value,
+                PostRequest(content = "  ", postType = PostType.IMAGE, mediaDraftIds = listOf(draft.id.value))
+            )
+
+            assertEquals("", response.content)
+            assertEquals(listOf(draft.url), response.mediaItems.map { it.url })
+        }
+    }
+
+    @Test
+    fun `포스트 수정 - 미디어가 남으면 내용을 비울 수 있고 미디어까지 다 빼면 실패`() {
+        runBlocking {
+            val user = TestFixtures.createTestUser()
+            val post = TestFixtures.createTestPost(userId = user.id.value)
+
+            // 미디어 없는 글은 비울 수 없음
+            assertFailsWith<InvalidPostContentException> {
+                postService.updatePost(post.id.value, user.id.value, UpdatePostRequest(content = ""))
+            }
+
+            val media = attachByUpdate(post.id.value, user.id.value, files = listOf(byteArrayOf(1))).mediaItems.single()
+            assertEquals("", postService.updatePost(post.id.value, user.id.value, UpdatePostRequest(content = "")).content)
+
+            assertFailsWith<InvalidPostContentException> {
+                attachByUpdate(post.id.value, user.id.value, keepMediaIds = emptyList())
+            }
+            assertEquals(listOf(media.id), query { PostMediaDao.find { PostMediaTable.postId eq post.id.value }.map { it.id.value } })
+        }
+    }
+
+    @Test
     fun `포스트 생성 실패 - 그 등급의 활성 플랜이 없는 크리에이터`() {
         runBlocking {
             // Given

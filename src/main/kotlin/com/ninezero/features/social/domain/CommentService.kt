@@ -75,7 +75,7 @@ class CommentService(
     ): CommentResponse {
         val trimmedContent = content.trim()
 
-        SocialValidation.validateCommentContent(trimmedContent)
+        SocialValidation.validateCommentContent(trimmedContent, mediaDraftIds.size)
         SocialValidation.validateClientRequestId(clientRequestId)
 
         // 같은 요청이 반복되면 만든 댓글을 그대로
@@ -403,13 +403,16 @@ class CommentService(
         content: String
     ): CommentResponse {
         val trimmedContent = content.trim()
-        SocialValidation.validateCommentContent(trimmedContent)
 
         return query {
             requireOwnedComment(  // 작성자만
                 commentId = commentId,
                 userId = userId,
                 errorMessage = Errors.Social.Comment.COMMENT_UPDATE_PERMISSION_DENIED
+            )
+            SocialValidation.validateCommentContent(
+                trimmedContent,
+                CommentMediaDao.count(CommentMediaTable.commentId eq commentId).toInt()
             )
 
             val updatedComment = commentRepository.updateComment(commentId, trimmedContent)
@@ -690,7 +693,6 @@ class CommentService(
 
         try {
             val finalContent = content?.trim()
-            finalContent?.let { SocialValidation.validateCommentContent(it) }
 
             // 수정은 사진 파일 파트만
             val files = newFiles.orEmpty()
@@ -709,6 +711,7 @@ class CommentService(
                     .toList()
 
                 val plan = resolveMediaEditPlan(currentItems, keepMediaIds, reorder, files.size) { it.sortOrder }
+                SocialValidation.validateCommentContent(finalContent ?: comment.content, plan.orderedKeepIds.size + files.size)
 
                 // 원본 + 썸네일 수거
                 mediaAttachmentsToDelete.addAll(
